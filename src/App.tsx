@@ -14,7 +14,7 @@ export default function App() {
   } = useDraft();
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route
           path="/"
