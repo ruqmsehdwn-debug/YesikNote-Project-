@@ -3,6 +3,7 @@ import type {
   CeremonyItem,
   ValidationIssue,
 } from '../models/ceremony';
+import { ceremonyItemDisplayTitle } from './scriptEngine';
 
 function activeTree(items: CeremonyItem[]) {
   return items.flatMap((item) =>
@@ -73,7 +74,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
         itemId: item.id,
         field: 'narrationOverride',
         severity: 'blocking',
-        message: `${item.title}의 MC 대본을 입력해 주세요.`,
+        message: `${ceremonyItemDisplayTitle(item)}의 MC 대본을 입력해 주세요.`,
       });
     }
 
@@ -84,7 +85,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
           id: `${item.id}-${person.id}-name`,
           itemId: item.id,
           severity: 'blocking',
-          message: `${item.title} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
+          message: `${ceremonyItemDisplayTitle(item)} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
         });
       }
       if (person.introMode === 'custom' && !person.introText?.trim()) {
@@ -105,7 +106,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
         id: `${item.id}-required-person`,
         itemId: item.id,
         severity: 'blocking',
-        message: `${item.title} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
+        message: `${ceremonyItemDisplayTitle(item)} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
       });
     }
 

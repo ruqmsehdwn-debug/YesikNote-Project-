@@ -72,6 +72,21 @@ describe('validation and storage', () => {
     expect(completionRate(draft)).toBe(100);
   });
 
+  it('복제된 speech의 Validation 메시지에도 사용자 표시명만 사용한다', () => {
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.id = 'copy-validation-speech';
+    speech.title = '덕담/축사 복사본';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+
+    const messages = validateDraft(draft)
+      .filter((issue) => issue.itemId === speech.id)
+      .map((issue) => issue.message);
+
+    expect(messages).toContain('축사 소개 대상의 이름 또는 호칭을 입력해 주세요.');
+    expect(messages.join(' ')).not.toContain('복사본');
+  });
+
   it('비권장 핵심 순서는 차단이 아니라 warning이다', () => {
     const draft = completeBasic();
     const vows = draft.items.find((item) => item.type === 'vows')!;
@@ -92,6 +107,21 @@ describe('validation and storage', () => {
       DRAFT_SCHEMA_VERSION,
     );
     expect(loadDraft()?.items.find((item) => item.type === 'candle_lighting')?.children?.[0].order).toBe(5);
+  });
+
+  it('혼인서약 소개 멘트를 저장하고 Draft 복원 후에도 유지한다', () => {
+    const draft = completeBasic();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    vows.customIntro = '복원할 혼인서약 소개 멘트';
+
+    saveDraft(draft);
+
+    expect(loadDraft()?.items.find((item) => item.id === vows.id)?.customIntro).toBe(
+      '복원할 혼인서약 소개 멘트',
+    );
+    expect(JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)!).schemaVersion).toBe(
+      DRAFT_SCHEMA_VERSION,
+    );
   });
 
   it.each([

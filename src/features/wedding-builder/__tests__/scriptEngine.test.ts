@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { createDraft, restoreCanonicalOrder } from '../data/ceremonyTemplates';
 import type { CeremonyDraft, CeremonyItem } from '../models/ceremony';
-import { generateScript } from '../services/scriptEngine';
+import { OwnerBuilderPage } from '../pages/OwnerBuilderPage';
+import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngine';
 import { McPrompterPage } from '../../mc-prompter/pages/McPrompterPage';
 
 function filledDraft(type: CeremonyDraft['ceremonyType'] = 'no_officiant') {
@@ -24,6 +25,36 @@ function filledDraft(type: CeremonyDraft['ceremonyType'] = 'no_officiant') {
 
 const section = (draft: CeremonyDraft, type: string) =>
   generateScript(draft).ceremonySections.find((item) => item.id === draft.items.find((source) => source.type === type)?.id);
+
+function ownerPage(draft: CeremonyDraft) {
+  return createElement(
+    MemoryRouter,
+    null,
+    createElement(OwnerBuilderPage, {
+      draft,
+      setDraft: () => undefined,
+      saveStatus: 'idle',
+      lastSavedAt: null,
+      compositionHandlers: {
+        onCompositionStart: () => undefined,
+        onCompositionEnd: () => undefined,
+      },
+    }),
+  );
+}
+
+function moveItemFirst(draft: CeremonyDraft, type: string) {
+  const target = draft.items.find((item) => item.type === type)!;
+  draft.items = [target, ...draft.items.filter((item) => item.id !== target.id)]
+    .map((item, order) => ({ ...item, order }));
+  return draft.items.find((item) => item.id === target.id)!;
+}
+
+function advancePastChecklist(view: ReturnType<typeof render>) {
+  fireEvent.click(view.getByRole('button', { name: '완료' }));
+  fireEvent.click(view.getByRole('button', { name: '완료' }));
+  fireEvent.click(view.getByRole('button', { name: '완료' }));
+}
 
 describe('scriptEngine', () => {
   it('식전 안내를 15/10/5분 세 번 만들고 피로연 장소를 말하지 않는다', () => {
@@ -64,6 +95,189 @@ describe('scriptEngine', () => {
     if (has) expect(narration).toContain(has);
     else expect(narration).not.toContain('신부, 등장!');
     expect(narration).toContain(text);
+  });
+
+  it.each([
+    ['words', '덕담'],
+    ['congratulatory', '축사'],
+    [undefined, '덕담/축사'],
+  ] as const)('speechType %s의 사용자 표시명을 %s으로 만든다', (speechType, expected) => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType };
+    expect(ceremonyItemDisplayTitle(speech)).toBe(expected);
+    expect(section(draft, 'speech')?.title).toBe(expected);
+  });
+
+  it('복제 표시명을 계산해도 안정 ID와 저장 title은 바꾸지 않는다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.id = 'copy-stable-speech-id';
+    speech.title = '덕담/축사 복사본';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    const original = { id: speech.id, title: speech.title };
+
+    expect(ceremonyItemDisplayTitle(speech)).toBe('축사');
+    expect({ id: speech.id, title: speech.title }).toEqual(original);
+  });
+
+  it('Owner와 MC가 같은 speech 표시명을 사용하고 복사본을 노출하지 않는다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    draft.lastStep = 3;
+    const speech = moveItemFirst(draft, 'speech');
+    speech.id = 'copy-owner-mc-speech';
+    speech.title = '덕담/축사 복사본';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    const storedTitle = speech.title;
+
+    const ownerView = render(ownerPage(draft));
+    expect(ownerView.container.textContent).toContain('축사');
+    expect(ownerView.container.textContent).not.toContain('복사본');
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-now strong')?.textContent).toBe('축사');
+    expect(mcView.container.textContent).not.toContain('복사본');
+    expect(speech.title).toBe(storedTitle);
+    mcView.unmount();
+  });
+
+  it('신부 단독입장은 신부 전용 Cue와 Note만 생성한다', () => {
+    const draft = filledDraft();
+    const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+    bride.detailConfig = {
+      ...bride.detailConfig,
+      appearance: 'reveal_then_enter',
+      escort: 'solo',
+    };
+    const result = section(draft, 'bride_entrance')!;
+
+    expect(result.cue).toEqual(expect.arrayContaining([
+      '신부 대기 확인',
+      '신부 등장 장치 또는 문 오픈 방식 확인',
+      '신부 입장곡 준비 확인',
+      '신부 입장 Cue 확인',
+    ]));
+    expect(result.cue.join(' ')).not.toMatch(/아버님|동반자|인계/);
+    expect(result.note.join(' ')).not.toMatch(/아버님|동반자|인계/);
+  });
+
+  it('신부 아버님 동반입장은 실제 동반자 Cue와 Note를 생성한다', () => {
+    const draft = filledDraft();
+    const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+    bride.detailConfig = { ...bride.detailConfig, escort: 'father' };
+    const result = section(draft, 'bride_entrance')!;
+
+    expect(result.cue).toEqual(expect.arrayContaining([
+      '신부·아버님 대기 확인',
+      '아버님 보행 속도 확인',
+      '인계 동작 확인',
+      '동반 입장 Cue 확인',
+    ]));
+    expect(result.note.join(' ')).toContain('신부 아버님 보행 속도와 인계 동작');
+  });
+
+  it('직접 구성 입장은 특정 동반자를 추측하지 않고 중립 표현을 사용한다', () => {
+    const draft = filledDraft();
+    const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+    bride.detailConfig = { ...bride.detailConfig, escort: 'custom' };
+    const result = section(draft, 'bride_entrance')!;
+
+    expect(result.narration).not.toContain('아버님');
+    expect(result.cue).toContain('신부와 동반자 대기 확인');
+    expect(result.cue.join(' ')).not.toContain('아버님');
+    expect(result.note).toContain('동반자의 보행 속도와 인계 동작을 확인합니다.');
+  });
+
+  it('바로 입장은 등장 Cue를 제외하고 먼저 등장은 등장 Cue를 포함한다', () => {
+    const draft = filledDraft();
+    const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+    bride.detailConfig = {
+      ...bride.detailConfig,
+      escort: 'solo',
+      appearance: 'reveal_then_enter',
+    };
+    expect(section(draft, 'bride_entrance')?.cue).toContain('신부 등장 Cue 확인');
+    bride.detailConfig = { ...bride.detailConfig, appearance: 'direct' };
+    expect(section(draft, 'bride_entrance')?.cue).not.toContain('신부 등장 Cue 확인');
+  });
+
+  it('Owner 실시간 미리보기와 MC가 같은 신부 입장 Cue와 Note를 표시한다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    draft.lastStep = 3;
+    const bride = moveItemFirst(draft, 'bride_entrance');
+    bride.detailConfig = {
+      ...bride.detailConfig,
+      escort: 'solo',
+      appearance: 'direct',
+    };
+
+    const ownerView = render(ownerPage(draft));
+    const ownerText = ownerView.container.querySelector('.preview-panel')?.textContent ?? '';
+    expect(ownerText).toContain('신부 대기 확인');
+    expect(ownerText).toContain('신부 입장 동선과 Cue를 확인합니다.');
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-cue')?.textContent).toContain('신부 대기 확인');
+    expect(mcView.container.querySelector('.mc-note')?.textContent).toContain('신부 입장 동선과 Cue를 확인합니다.');
+    mcView.unmount();
+  });
+
+  it('혼인서약 소개 멘트를 기본 본문 앞에 한 번만 출력한다', () => {
+    const draft = filledDraft();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    vows.customIntro = '두 분이 직접 준비한 서약을 소개합니다.';
+    const narration = section(draft, 'vows')!.narration;
+
+    expect(narration.startsWith(vows.customIntro)).toBe(true);
+    expect(narration).toContain('다음은 두 사람이 사랑의 약속을 나누는 혼인서약 순서가 있겠습니다.');
+    expect(narration.match(/두 분이 직접 준비한 서약을 소개합니다\./g)).toHaveLength(1);
+  });
+
+  it('혼인서약 소개 멘트 뒤에 override만 출력하고 기본 본문은 중복하지 않는다', () => {
+    const draft = filledDraft();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    vows.customIntro = '사용자 소개 멘트';
+    vows.narrationOverride = '사용자 수정 혼인서약 본문';
+    const narration = section(draft, 'vows')!.narration;
+
+    expect(narration).toBe('사용자 소개 멘트\n사용자 수정 혼인서약 본문');
+    expect(narration).not.toContain('다음은 두 사람이 사랑의 약속을 나누는');
+  });
+
+  it('빈 혼인서약 소개 멘트는 최종 출력에 빈 문단을 만들지 않는다', () => {
+    const draft = filledDraft();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    vows.customIntro = '   ';
+    const narration = section(draft, 'vows')!.narration;
+
+    expect(narration.startsWith('다음은 두 사람이 사랑의 약속을 나누는')).toBe(true);
+    expect(narration).not.toContain('\n\n');
+  });
+
+  it('Owner 미리보기와 MC가 소개 멘트와 override를 같은 순서로 표시한다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    draft.lastStep = 3;
+    const vows = moveItemFirst(draft, 'vows');
+    vows.customIntro = '먼저 읽을 혼인서약 소개';
+    vows.narrationOverride = '그다음 읽을 혼인서약 본문';
+
+    const ownerView = render(ownerPage(draft));
+    const ownerText = ownerView.container.querySelector('.preview-panel')?.textContent ?? '';
+    expect(ownerText.indexOf(vows.customIntro)).toBeLessThan(ownerText.indexOf(vows.narrationOverride));
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    const mcText = mcView.container.querySelector('.mc-narration')?.textContent ?? '';
+    expect(mcText.indexOf(vows.customIntro)).toBeLessThan(mcText.indexOf(vows.narrationOverride));
+    mcView.unmount();
   });
 
   it('예물교환 미진행은 대본과 child를 모두 제외하고 재진행 시 복원한다', () => {

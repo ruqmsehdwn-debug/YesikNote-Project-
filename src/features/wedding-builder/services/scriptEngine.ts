@@ -15,6 +15,18 @@ const personLabel = (item: CeremonyItem, fallback = '') => {
   return person?.displayTitle || person?.name || fallback;
 };
 
+export function ceremonyItemDisplayTitle(item: CeremonyItem): string {
+  if (item.type === 'speech') {
+    if (item.detailConfig.speechType === 'words') return '덕담';
+    if (item.detailConfig.speechType === 'congratulatory') return '축사';
+    return '덕담/축사';
+  }
+  if (item.id.startsWith('copy-')) {
+    return item.title.replace(/(?: 복사본)+$/, '');
+  }
+  return item.title;
+}
+
 const dateParts = (date: string) => {
   const parsed = date ? new Date(`${date}T00:00:00`) : null;
   if (!parsed || Number.isNaN(parsed.getTime())) {
@@ -45,13 +57,6 @@ const baseCue: Record<string, string[]> = {
     '입장 문과 동선 확인',
     '입장 구령 직후 음원 시작',
     '단상 위치 도착 확인',
-  ],
-  bride_entrance: [
-    '신부 등장 장치 또는 문 오픈 방식 확인',
-    '신부·아버님 대기 확인',
-    '등장 큐와 입장 큐 확인',
-    '신부 입장곡 재생',
-    '신랑·신부 정렬 완료 확인',
   ],
   couple_bow: ['신랑·신부 서로 마주 보기', '진행 주체 확인 후 맞절 진행'],
   vows: ['서약서 준비 및 전달 확인', '낭독 완료 확인 후 다음 식순 준비'],
@@ -104,7 +109,6 @@ const baseNote: Record<string, string[]> = {
   opening: ['신랑·신부 이름과 날짜를 최종 확인합니다.'],
   officiant_entrance: ['주례 이름과 호칭을 최종 확인합니다.'],
   groom_entrance: ['아버님 동반 시 동행 종료 지점을 확인합니다.'],
-  bride_entrance: ['신부 아버님 보행 속도와 인계 동작을 확인합니다.'],
   couple_bow: ['주례 있는 예식에서는 사회자가 맞절 구령을 중복하지 않습니다.'],
   vows: ['혼인서약 원고 전문은 별도 펼침 영역에서 확인합니다.'],
   ring_exchange: ['화동이 어린이인 경우 멘트를 천천히 진행합니다.'],
@@ -116,6 +120,55 @@ const baseNote: Record<string, string[]> = {
   recessional: ['행진 이벤트와 음원 시작 시점을 확인합니다.'],
   closing: ['피로연 장소와 사진 촬영 안내를 최종 확인합니다.'],
 };
+
+type BrideEntranceState = {
+  reveal: boolean;
+  escort: 'father' | 'solo' | 'custom';
+};
+
+function brideEntranceState(item: CeremonyItem): BrideEntranceState {
+  const escort = item.detailConfig.escort;
+  return {
+    reveal: item.detailConfig.appearance !== 'direct',
+    escort: escort === 'father' || escort === 'solo' ? escort : 'custom',
+  };
+}
+
+function brideEntranceCue(item: CeremonyItem): string[] {
+  const { reveal, escort } = brideEntranceState(item);
+  const participantCue = escort === 'father'
+    ? [
+        '신부·아버님 대기 확인',
+        '아버님 보행 속도 확인',
+        '인계 동작 확인',
+      ]
+    : escort === 'solo'
+      ? ['신부 대기 확인']
+      : [
+          '신부와 동반자 대기 확인',
+          '동반자 보행 속도 확인',
+          '인계 동작 확인',
+        ];
+  return [
+    ...participantCue,
+    '신부 등장 장치 또는 문 오픈 방식 확인',
+    ...(reveal ? ['신부 등장 Cue 확인'] : []),
+    '신부 입장곡 준비 확인',
+    escort === 'solo' ? '신부 입장 Cue 확인' : '동반 입장 Cue 확인',
+    '신랑·신부 정렬 완료 확인',
+  ];
+}
+
+function brideEntranceNote(item: CeremonyItem): string[] {
+  const { escort } = brideEntranceState(item);
+  if (escort === 'father') {
+    return ['신부 아버님 보행 속도와 인계 동작을 확인합니다.'];
+  }
+  if (escort === 'solo') {
+    return ['신부 입장 동선과 Cue를 확인합니다.'];
+  }
+  return ['동반자의 보행 속도와 인계 동작을 확인합니다.'];
+}
 
 function standardNarration(item: CeremonyItem, draft: CeremonyDraft): string {
   const { groomName, brideName, banquetLocation, photoGuide } = draft.basicInfo;
@@ -189,8 +242,8 @@ function standardNarration(item: CeremonyItem, draft: CeremonyDraft): string {
         '신랑, 입장!',
       );
     case 'bride_entrance': {
-      const reveal = item.detailConfig.appearance !== 'direct';
-      const withFather = item.detailConfig.escort !== 'solo';
+      const { reveal, escort } = brideEntranceState(item);
+      const withFather = escort === 'father';
       if (reveal && withFather) {
         return lines(
           '이제 오늘 결혼식의 진정한 주인공이죠.',
@@ -246,11 +299,10 @@ function standardNarration(item: CeremonyItem, draft: CeremonyDraft): string {
           );
     case 'vows':
       return draft.ceremonyType === 'officiant'
-        ? lines('이어서 주례 선생님께서 신랑과 신부로부터 혼인서약을 받겠습니다.', intro)
+        ? '이어서 주례 선생님께서 신랑과 신부로부터 혼인서약을 받겠습니다.'
         : lines(
             '다음은 두 사람이 사랑의 약속을 나누는 혼인서약 순서가 있겠습니다.',
             '두 사람은 서약서를 전달받은 후 준비가 되면 혼인서약을 함께 낭독해 주시면 되겠습니다.',
-            intro,
           );
     case 'ring_exchange': {
       const flower = item.detailConfig.flowerChild;
@@ -450,15 +502,23 @@ const candleChildScript: Record<string, { narration: string; cue: string[] }> = 
 
 function sectionForItem(item: CeremonyItem, draft: CeremonyDraft, orderPath: number[]): ScriptSection {
   const defaultText = item.useDefaultNarration ? standardNarration(item, draft) : '';
-  const narration = item.narrationOverride?.trim() || defaultText;
-  const note = [...(baseNote[item.type] ?? [])];
+  const selectedText = item.narrationOverride?.trim() || defaultText;
+  const narration = item.type === 'vows'
+    ? lines(item.customIntro?.trim(), selectedText)
+    : selectedText;
+  const note = [
+    ...(item.type === 'bride_entrance'
+      ? brideEntranceNote(item)
+      : baseNote[item.type] ?? []),
+  ];
   if (item.requestNote?.trim()) note.push(item.requestNote.trim());
   return {
     id: item.id,
     parentId: item.parentId,
-    title: item.title,
+    title: ceremonyItemDisplayTitle(item),
     narration,
-    cue: item.cueOverride ?? baseCue[item.type] ?? [],
+    cue: item.cueOverride
+      ?? (item.type === 'bride_entrance' ? brideEntranceCue(item) : baseCue[item.type] ?? []),
     note,
     orderPath,
     estimatedTimeSeconds: item.estimatedTimeSeconds,

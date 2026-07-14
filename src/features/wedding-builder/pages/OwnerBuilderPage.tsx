@@ -14,7 +14,7 @@ import type {
   SaveStatus,
 } from '../models/ceremony';
 import { completionRate, validateDraft } from '../services/draftValidator';
-import { generateScript } from '../services/scriptEngine';
+import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngine';
 import { ItemDetailEditor } from '../components/ItemDetailEditor';
 import { ScriptPreview } from '../components/ScriptPreview';
 import { SortableItemList } from '../components/SortableItemList';
@@ -46,6 +46,9 @@ export function OwnerBuilderPage({
   const blocking = issues.filter((issue) => issue.severity === 'blocking');
   const warnings = issues.filter((issue) => issue.severity === 'warning');
   const selectedItem = draft.items.find((item) => item.id === selectedId) ?? draft.items[0];
+  const displayedSelectedItem = selectedItem
+    ? { ...selectedItem, title: ceremonyItemDisplayTitle(selectedItem) }
+    : undefined;
 
   const setStep = (next: number) => {
     const value = Math.min(Math.max(next, 1), 5);
@@ -133,7 +136,7 @@ export function OwnerBuilderPage({
               onDuplicate={duplicateItem}
               onDelete={(id) => {
                 const target = draft.items.find((item) => item.id === id);
-                if (target && window.confirm(`‘${target.title}’ 식순을 삭제할까요? 미진행과 달리 입력값도 삭제됩니다.`)) {
+                if (target && window.confirm(`‘${ceremonyItemDisplayTitle(target)}’ 식순을 삭제할까요? 미진행과 달리 입력값도 삭제됩니다.`)) {
                   updateItems(draft.items.filter((item) => item.id !== id));
                 }
               }}
@@ -154,9 +157,17 @@ export function OwnerBuilderPage({
           {step === 4 && (
             <div className="detail-layout">
               <div className="detail-rail">
-                <label className="select-label">편집할 식순<select value={selectedItem?.id ?? ''} onChange={(e) => setSelectedId(e.target.value)}>{draft.items.map((item) => <option value={item.id} key={item.id}>{item.order + 1}. {item.title}{item.active ? '' : ' (미진행)'}</option>)}</select></label>
+                <label className="select-label">편집할 식순<select value={selectedItem?.id ?? ''} onChange={(e) => setSelectedId(e.target.value)}>{draft.items.map((item) => <option value={item.id} key={item.id}>{item.order + 1}. {ceremonyItemDisplayTitle(item)}{item.active ? '' : ' (미진행)'}</option>)}</select></label>
               </div>
-              {selectedItem ? <ItemDetailEditor item={selectedItem} onChange={updateItem} /> : <EmptyCustom onAdd={() => { const custom = createCustomItem(0); updateItems([custom]); setSelectedId(custom.id); }} />}
+              {selectedItem && displayedSelectedItem ? (
+                <ItemDetailEditor
+                  item={displayedSelectedItem}
+                  onChange={(next) => updateItem({
+                    ...next,
+                    title: next.title === displayedSelectedItem.title ? selectedItem.title : next.title,
+                  })}
+                />
+              ) : <EmptyCustom onAdd={() => { const custom = createCustomItem(0); updateItems([custom]); setSelectedId(custom.id); }} />}
             </div>
           )}
           {step === 5 && <ReviewStep draft={draft} script={script} blocking={blocking} warnings={warnings} onEdit={(id) => { setSelectedId(id); setStep(4); }} />}
@@ -218,10 +229,15 @@ function CeremonyTypeStep({ draft, onChange }: { draft: CeremonyDraft; onChange:
 }
 
 function OrderStep({ draft, selectedId, onItemsChange, onSelect, onToggle, onDuplicate, onDelete, onAdd, onReset }: { draft: CeremonyDraft; selectedId?: string; onItemsChange: (items: CeremonyItem[]) => void; onSelect: (id: string) => void; onToggle: (id: string) => void; onDuplicate: (id: string) => void; onDelete: (id: string) => void; onAdd: () => void; onReset: () => void }) {
+  const storedTitles = new Map(draft.items.map((item) => [item.id, item.title]));
+  const displayedItems = draft.items.map((item) => ({
+    ...item,
+    title: ceremonyItemDisplayTitle(item),
+  }));
   return (
     <div className="page-section">
       <div className="heading-row"><div className="page-heading"><span className="section-kicker">STEP 3</span><h1>전체 식순을 완성하세요</h1><p>끌어서 옮기거나 화살표 버튼으로 순서를 조정하세요.</p></div><div className="heading-actions"><button type="button" className="button secondary" onClick={onReset} disabled={draft.ceremonyType === 'religious' || draft.ceremonyType === 'custom'}>기본 순서로 되돌리기</button><button type="button" className="button primary" onClick={onAdd}>+ 자유 식순 추가</button></div></div>
-      {draft.items.length ? <SortableItemList items={draft.items} selectedId={selectedId} onChange={onItemsChange} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} /> : <EmptyCustom onAdd={onAdd} />}
+      {draft.items.length ? <SortableItemList items={displayedItems} selectedId={selectedId} onChange={(items) => onItemsChange(items.map((item) => ({ ...item, title: storedTitles.get(item.id) ?? item.title })))} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} /> : <EmptyCustom onAdd={onAdd} />}
     </div>
   );
 }
