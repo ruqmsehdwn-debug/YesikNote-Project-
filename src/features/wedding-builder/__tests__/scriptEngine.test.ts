@@ -1,7 +1,11 @@
+import { createElement } from 'react';
+import { fireEvent, render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { createDraft } from '../data/ceremonyTemplates';
+import { createDraft, restoreCanonicalOrder } from '../data/ceremonyTemplates';
 import type { CeremonyDraft, CeremonyItem } from '../models/ceremony';
 import { generateScript } from '../services/scriptEngine';
+import { McPrompterPage } from '../../mc-prompter/pages/McPrompterPage';
 
 function filledDraft(type: CeremonyDraft['ceremonyType'] = 'no_officiant') {
   const draft = createDraft(type);
@@ -139,6 +143,56 @@ describe('scriptEngine', () => {
     expect(result[0].id).toBe(candle.id);
     expect(result[1].parentId).toBe(candle.id);
     expect(result[1].title).toBe('자리 이동');
+  });
+
+  it('Canonical 순서 복원 후에도 실제 order, ID, override와 inactive 정책을 유지한다', () => {
+    const draft = filledDraft();
+    const bow = draft.items.find((item) => item.type === 'couple_bow')!;
+    const rings = draft.items.find((item) => item.type === 'ring_exchange')!;
+    bow.narrationOverride = '직접 작성한 맞절 대본';
+    rings.narrationOverride = '직접 작성한 예물교환 대본';
+    rings.active = false;
+    draft.items = restoreCanonicalOrder(
+      [...draft.items].reverse().map((item, order) => ({ ...item, order })),
+      draft.ceremonyType,
+    );
+
+    const result = generateScript(draft).ceremonySections;
+    const topLevelIds = result
+      .filter((item) => !item.parentId)
+      .map((item) => item.id);
+    const expectedIds = [...draft.items]
+      .sort((a, b) => a.order - b.order)
+      .filter((item) => item.active)
+      .map((item) => item.id);
+
+    expect(topLevelIds).toEqual(expectedIds);
+    expect(result.find((item) => item.id === bow.id)?.narration).toBe(
+      '직접 작성한 맞절 대본',
+    );
+    expect(result.some((item) => item.id === rings.id)).toBe(false);
+    expect(rings.narrationOverride).toBe('직접 작성한 예물교환 대본');
+  });
+
+  it('MC 읽기 전용 화면은 Owner의 실제 정렬 순서를 그대로 사용한다', () => {
+    const draft = filledDraft();
+    const rings = draft.items.find((item) => item.type === 'ring_exchange')!;
+    draft.items = [rings, ...draft.items.filter((item) => item.id !== rings.id)]
+      .map((item, order) => ({ ...item, order }));
+    const view = render(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(McPrompterPage, { draft }),
+      ),
+    );
+
+    fireEvent.click(view.getByRole('button', { name: '완료' }));
+    fireEvent.click(view.getByRole('button', { name: '완료' }));
+    fireEvent.click(view.getByRole('button', { name: '완료' }));
+
+    expect(view.container.querySelector('.mc-now strong')?.textContent).toBe('예물교환');
+    expect(view.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('자유 식순은 승인되지 않은 기본 대본을 생성하지 않는다', () => {

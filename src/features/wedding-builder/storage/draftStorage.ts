@@ -1,19 +1,57 @@
 import type { CeremonyDraft } from '../models/ceremony';
+import { migrateLegacyTemplate } from '../data/ceremonyTemplates';
 
 export const DRAFT_STORAGE_KEY = 'yesiknote:owner-builder:draft:v1';
+export const DRAFT_BACKUP_STORAGE_KEY = `${DRAFT_STORAGE_KEY}:backup:schema1`;
 export const MC_STORAGE_KEY = 'yesiknote:mc-prompter:state:v1';
+export const DRAFT_SCHEMA_VERSION = 2;
 
-type StoredDraftEnvelope = {
+type StoredDraftEnvelopeV1 = {
   schemaVersion: 1;
   templateVersion: string;
   savedAt: string;
   draft: CeremonyDraft;
 };
 
+type StoredDraftEnvelope = {
+  schemaVersion: typeof DRAFT_SCHEMA_VERSION;
+  templateVersion: string;
+  savedAt: string;
+  migratedAt?: string;
+  draft: CeremonyDraft;
+};
+
+function hasDraft(value: unknown): value is StoredDraftEnvelopeV1 | StoredDraftEnvelope {
+  if (!value || typeof value !== 'object') return false;
+  const envelope = value as Partial<StoredDraftEnvelopeV1>;
+  return !!envelope.draft?.items && Array.isArray(envelope.draft.items);
+}
+
+function migrateEnvelope(
+  envelope: StoredDraftEnvelopeV1,
+  rawValue: string,
+): CeremonyDraft {
+  const draft = migrateLegacyTemplate(envelope.draft);
+  const migratedAt = new Date().toISOString();
+  const migrated: StoredDraftEnvelope = {
+    schemaVersion: DRAFT_SCHEMA_VERSION,
+    templateVersion: draft.templateVersion,
+    savedAt: envelope.savedAt,
+    migratedAt,
+    draft,
+  };
+
+  if (!localStorage.getItem(DRAFT_BACKUP_STORAGE_KEY)) {
+    localStorage.setItem(DRAFT_BACKUP_STORAGE_KEY, rawValue);
+  }
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(migrated));
+  return draft;
+}
+
 export function saveDraft(draft: CeremonyDraft): string {
   const savedAt = new Date().toISOString();
   const envelope: StoredDraftEnvelope = {
-    schemaVersion: 1,
+    schemaVersion: DRAFT_SCHEMA_VERSION,
     templateVersion: draft.templateVersion,
     savedAt,
     draft: { ...draft, updatedAt: savedAt },
@@ -26,9 +64,15 @@ export function loadDraft(): CeremonyDraft | null {
   const value = localStorage.getItem(DRAFT_STORAGE_KEY);
   if (!value) return null;
   try {
-    const envelope = JSON.parse(value) as StoredDraftEnvelope;
-    if (envelope.schemaVersion !== 1 || !envelope.draft?.items) return null;
-    return envelope.draft;
+    const envelope = JSON.parse(value) as unknown;
+    if (!hasDraft(envelope)) return null;
+    if (envelope.schemaVersion === DRAFT_SCHEMA_VERSION) return envelope.draft;
+    if (envelope.schemaVersion !== 1) return null;
+    try {
+      return migrateEnvelope(envelope, value);
+    } catch {
+      return envelope.draft;
+    }
   } catch {
     return null;
   }

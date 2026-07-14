@@ -5,6 +5,7 @@ import {
   createId,
   createTemplate,
   resetOrders,
+  restoreCanonicalOrder,
 } from '../data/ceremonyTemplates';
 import type {
   CeremonyDraft,
@@ -142,8 +143,8 @@ export function OwnerBuilderPage({
                 setSelectedId(custom.id);
               }}
               onReset={() => {
-                if (window.confirm('현재 순서와 편집 내용을 기본 식순으로 되돌릴까요?')) {
-                  const items = createTemplate(draft.ceremonyType);
+                if (window.confirm('기존 입력값은 유지하고 식순을 기본 순서로 되돌릴까요?')) {
+                  const items = restoreCanonicalOrder(draft.items, draft.ceremonyType);
                   updateItems(items);
                   setSelectedId(items[0]?.id);
                 }

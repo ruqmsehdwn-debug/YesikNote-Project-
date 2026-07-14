@@ -44,50 +44,84 @@ export type CandleMode =
   | 'omit'
   | 'custom';
 
+const candleDefinitions: Record<
+  Exclude<CandleMode, 'omit' | 'custom'>,
+  Array<[string, string]>
+> = {
+  mothers: [
+    ['candle_mothers_entry', '양가 어머님 입장'],
+    ['candle_groom_mother_light', '신랑 어머님 화촉점화'],
+    ['candle_bride_mother_light', '신부 어머님 화촉점화'],
+    ['candle_mothers_bow', '양가 어머님 맞절'],
+    ['candle_mothers_guest_bow', '양가 어머님 내빈께 인사'],
+    ['candle_mothers_seat', '자리 이동'],
+  ],
+  parents_a: [
+    ['candle_groom_parents_entry', '신랑 부모님 입장'],
+    ['candle_bride_parents_entry', '신부 부모님 입장'],
+    ['candle_parents_bow', '양가 부모님 맞절'],
+    ['candle_fathers_seat', '양가 아버님 자리 착석'],
+    ['candle_groom_mother_light', '신랑 어머님 화촉점화'],
+    ['candle_bride_mother_light', '신부 어머님 화촉점화'],
+    ['candle_mothers_guest_bow', '양가 어머님 내빈께 인사'],
+    ['candle_mothers_seat', '양가 어머님 자리 이동'],
+  ],
+  parents_b: [
+    ['candle_groom_parents_entry', '신랑 부모님 입장'],
+    ['candle_bride_parents_entry', '신부 부모님 입장'],
+    ['candle_groom_parents_light', '신랑 부모님 화촉점화'],
+    ['candle_bride_parents_light', '신부 부모님 화촉점화'],
+    ['candle_parents_bow', '양가 부모님 맞절'],
+    ['candle_parents_guest_bow', '양가 부모님 내빈께 인사'],
+    ['candle_parents_seat', '양가 부모님 자리 이동'],
+  ],
+  single_host: [
+    ['candle_single_entry', '혼주님 입장'],
+    ['candle_single_light', '혼주님 화촉점화'],
+    ['candle_single_guest_bow', '혼주님 내빈께 인사'],
+    ['candle_single_seat', '혼주님 자리 이동'],
+  ],
+};
+
 export function createCandleChildren(
   parentId: string,
   mode: CandleMode,
 ): CeremonyItem[] {
-  const definitions: Record<Exclude<CandleMode, 'omit' | 'custom'>, Array<[string, string]>> = {
-    mothers: [
-      ['candle_mothers_entry', '양가 어머님 입장'],
-      ['candle_groom_mother_light', '신랑 어머님 화촉점화'],
-      ['candle_bride_mother_light', '신부 어머님 화촉점화'],
-      ['candle_mothers_bow', '양가 어머님 맞절'],
-      ['candle_mothers_guest_bow', '양가 어머님 내빈께 인사'],
-      ['candle_mothers_seat', '자리 이동'],
-    ],
-    parents_a: [
-      ['candle_groom_parents_entry', '신랑 부모님 입장'],
-      ['candle_bride_parents_entry', '신부 부모님 입장'],
-      ['candle_parents_bow', '양가 부모님 맞절'],
-      ['candle_fathers_seat', '양가 아버님 자리 착석'],
-      ['candle_groom_mother_light', '신랑 어머님 화촉점화'],
-      ['candle_bride_mother_light', '신부 어머님 화촉점화'],
-      ['candle_mothers_guest_bow', '양가 어머님 내빈께 인사'],
-      ['candle_mothers_seat', '양가 어머님 자리 이동'],
-    ],
-    parents_b: [
-      ['candle_groom_parents_entry', '신랑 부모님 입장'],
-      ['candle_bride_parents_entry', '신부 부모님 입장'],
-      ['candle_groom_parents_light', '신랑 부모님 화촉점화'],
-      ['candle_bride_parents_light', '신부 부모님 화촉점화'],
-      ['candle_parents_bow', '양가 부모님 맞절'],
-      ['candle_parents_guest_bow', '양가 부모님 내빈께 인사'],
-      ['candle_parents_seat', '양가 부모님 자리 이동'],
-    ],
-    single_host: [
-      ['candle_single_entry', '혼주님 입장'],
-      ['candle_single_light', '혼주님 화촉점화'],
-      ['candle_single_guest_bow', '혼주님 내빈께 인사'],
-      ['candle_single_seat', '혼주님 자리 이동'],
-    ],
-  };
-
   if (mode === 'omit' || mode === 'custom') return [];
-  return definitions[mode].map(([type, title], order) =>
+  return candleDefinitions[mode].map(([type, title], order) =>
     child(parentId, type, title, order),
   );
+}
+
+export function reconcileCandleChildren(
+  parentId: string,
+  children: CeremonyItem[],
+  mode: CandleMode,
+): CeremonyItem[] {
+  if (mode === 'omit' || mode === 'custom') {
+    return [...children]
+      .sort((a, b) => a.order - b.order)
+      .map((current, order) => ({ ...current, parentId, order }));
+  }
+
+  const sorted = [...children].sort((a, b) => a.order - b.order);
+  const usedIds = new Set<string>();
+  const canonical = candleDefinitions[mode].map(([type, title], order) => {
+    const existing = sorted.find(
+      (current) => current.type === type && !usedIds.has(current.id),
+    );
+    if (!existing) return child(parentId, type, title, order);
+    usedIds.add(existing.id);
+    return { ...existing, parentId, order };
+  });
+  const extras = sorted
+    .filter((current) => !usedIds.has(current.id))
+    .map((current, index) => ({
+      ...current,
+      parentId,
+      order: canonical.length + index,
+    }));
+  return [...canonical, ...extras];
 }
 
 function item(
@@ -191,6 +225,200 @@ export function createTemplate(type: CeremonyType): CeremonyItem[] {
   return definitions.map(([itemType, title, config], order) =>
     item(itemType, title, order, config),
   );
+}
+
+function definitionsFor(type: CeremonyType) {
+  if (type === 'religious' || type === 'custom') return [];
+  return type === 'officiant' ? officiantDefinitions : noOfficiantDefinitions;
+}
+
+function candleMode(value: unknown): CandleMode | null {
+  return ['mothers', 'parents_a', 'parents_b', 'single_host', 'omit', 'custom'].includes(
+    String(value),
+  )
+    ? (value as CandleMode)
+    : null;
+}
+
+function reconcileCandleItem(current: CeremonyItem): CeremonyItem {
+  if (current.type !== 'candle_lighting') return current;
+  const mode = candleMode(current.detailConfig.mode);
+  if (!mode) return current;
+  return {
+    ...current,
+    children: reconcileCandleChildren(current.id, current.children ?? [], mode),
+  };
+}
+
+export function restoreCanonicalOrder(
+  items: CeremonyItem[],
+  type: CeremonyType,
+): CeremonyItem[] {
+  const definitions = definitionsFor(type);
+  if (definitions.length === 0) return resetOrders(items);
+
+  const sorted = [...items].sort((a, b) => a.order - b.order);
+  const usedIds = new Set<string>();
+  const canonical = definitions.map(([itemType, title, config], order) => {
+    const existing = sorted.find(
+      (current) => current.type === itemType && !usedIds.has(current.id),
+    );
+    if (!existing) return item(itemType, title, order, config);
+    usedIds.add(existing.id);
+    return reconcileCandleItem({ ...existing, order });
+  });
+  const extras = sorted
+    .filter((current) => !usedIds.has(current.id))
+    .map((current, index) => ({ ...current, order: canonical.length + index }));
+  return [...canonical, ...extras];
+}
+
+const semanticTitles: Record<'couple_bow' | 'ring_exchange', string[]> = {
+  couple_bow: ['신랑·신부 맞절', '신랑 신부 맞절'],
+  ring_exchange: ['예물교환', '예물 교환'],
+};
+
+function normalizedTitle(value: string) {
+  return value.replace(/[\s·-]/g, '');
+}
+
+function hasSemanticItem(
+  items: CeremonyItem[],
+  type: 'couple_bow' | 'ring_exchange',
+) {
+  const titles = semanticTitles[type].map(normalizedTitle);
+  return items.some(
+    (current) =>
+      current.type === type || titles.includes(normalizedTitle(current.title)),
+  );
+}
+
+function insertAfterType(
+  items: CeremonyItem[],
+  anchorType: CeremonyItemType,
+  inserted: CeremonyItem,
+) {
+  const index = items.findIndex((current) => current.type === anchorType);
+  if (index < 0) throw new Error(`Legacy migration anchor not found: ${anchorType}`);
+  const result = [...items];
+  result.splice(index + 1, 0, inserted);
+  return result;
+}
+
+function canSafelyReconcileLegacyChildren(current: CeremonyItem, mode: CandleMode) {
+  if (mode === 'omit' || mode === 'custom') return true;
+  const canonicalTypes = new Set(candleDefinitions[mode].map(([type]) => type));
+  const children = current.children ?? [];
+  return children.every(
+    (nested) => nested.type === 'custom' || canonicalTypes.has(nested.type),
+  ) && [...canonicalTypes].every(
+    (type) => children.filter((nested) => nested.type === type).length <= 1,
+  );
+}
+
+function migrateLegacyCandleChildren(
+  parentId: string,
+  children: CeremonyItem[],
+  mode: CandleMode,
+) {
+  if (mode === 'omit' || mode === 'custom') {
+    return [...children]
+      .sort((a, b) => a.order - b.order)
+      .map((nested, order) => ({ ...nested, parentId, order }));
+  }
+
+  const definitions = candleDefinitions[mode];
+  const result = [...children].sort((a, b) => a.order - b.order);
+  definitions.forEach(([type, title], canonicalIndex) => {
+    if (result.some((nested) => nested.type === type)) return;
+
+    const previousTypes = definitions
+      .slice(0, canonicalIndex)
+      .map(([previousType]) => previousType)
+      .reverse();
+    const previousIndex = previousTypes
+      .map((previousType) => result.findIndex((nested) => nested.type === previousType))
+      .find((index) => index >= 0);
+    if (previousIndex !== undefined) {
+      result.splice(previousIndex + 1, 0, child(parentId, type, title, 0));
+      return;
+    }
+
+    const nextTypes = definitions
+      .slice(canonicalIndex + 1)
+      .map(([nextType]) => nextType);
+    const nextIndex = nextTypes
+      .map((nextType) => result.findIndex((nested) => nested.type === nextType))
+      .find((index) => index >= 0);
+    result.splice(nextIndex ?? result.length, 0, child(parentId, type, title, 0));
+  });
+
+  return result.map((nested, order) => ({ ...nested, parentId, order }));
+}
+
+export function migrateLegacyTemplate(draft: CeremonyDraft): CeremonyDraft {
+  if (
+    draft.templateVersion === TEMPLATE_VERSION ||
+    draft.ceremonyType === 'religious' ||
+    draft.ceremonyType === 'custom'
+  ) {
+    return draft;
+  }
+
+  const definitions = definitionsFor(draft.ceremonyType);
+  const canonicalTypes = definitions.map(([type]) => type);
+  const missingCoupleBow = !hasSemanticItem(draft.items, 'couple_bow');
+  const missingRingExchange = !hasSemanticItem(draft.items, 'ring_exchange');
+  const allowedMissing = new Set<CeremonyItemType>([
+    ...(missingCoupleBow ? ['couple_bow' as const] : []),
+    ...(missingRingExchange ? ['ring_exchange' as const] : []),
+  ]);
+
+  const safeLegacyShape = canonicalTypes.every((type) => {
+    const count = draft.items.filter((current) => current.type === type).length;
+    return allowedMissing.has(type) ? count === 0 : count === 1;
+  });
+  if (!safeLegacyShape) {
+    if (missingCoupleBow || missingRingExchange) {
+      throw new Error('Legacy ceremony items cannot be migrated without ambiguity.');
+    }
+    return draft;
+  }
+
+  let items = [...draft.items].sort((a, b) => a.order - b.order);
+  if (missingCoupleBow) {
+    items = insertAfterType(
+      items,
+      'bride_entrance',
+      item('couple_bow', '신랑·신부 맞절', 0),
+    );
+  }
+  if (missingRingExchange) {
+    items = insertAfterType(
+      items,
+      'vows',
+      item('ring_exchange', '예물교환', 0, { flowerChildEnabled: false }),
+    );
+  }
+
+  items = items.map((current) => {
+    if (current.type !== 'candle_lighting') return current;
+    const mode = candleMode(current.detailConfig.mode);
+    if (!mode) return current;
+    if (!canSafelyReconcileLegacyChildren(current, mode)) {
+      throw new Error('Legacy candle children cannot be migrated without ambiguity.');
+    }
+    return {
+      ...current,
+      children: migrateLegacyCandleChildren(current.id, current.children ?? [], mode),
+    };
+  });
+
+  return {
+    ...draft,
+    items: resetOrders(items),
+    templateVersion: TEMPLATE_VERSION,
+  };
 }
 
 export function createCustomItem(order: number): CeremonyItem {
