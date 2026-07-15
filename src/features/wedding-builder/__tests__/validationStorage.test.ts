@@ -1,7 +1,8 @@
 import { createElement } from 'react';
-import { render, within } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { ItemDetailEditor } from '../components/ItemDetailEditor';
 import {
   createCandleChildren,
   createCustomItem,
@@ -122,6 +123,274 @@ describe('validation and storage', () => {
     expect(JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)!).schemaVersion).toBe(
       DRAFT_SCHEMA_VERSION,
     );
+  });
+
+  it('축사 소개 멘트 원문을 같은 Draft key와 schema로 저장·복원한다', () => {
+    localStorage.clear();
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '저장하고 복원할 축사 소개 멘트 원문';
+
+    saveDraft(draft);
+    const restored = loadDraft()!;
+
+    expect(restored.items.find((item) => item.id === speech.id)?.customIntro).toBe(
+      '저장하고 복원할 축사 소개 멘트 원문',
+    );
+    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)!).schemaVersion).toBe(
+      DRAFT_SCHEMA_VERSION,
+    );
+  });
+
+  it('혼인서약·성혼선언 사회자 진행 조합과 원본 데이터를 저장·복원한다', () => {
+    localStorage.clear();
+    const draft = completeBasic();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    vows.detailConfig = { ...vows.detailConfig, mode: 'mc' };
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'mc' };
+    vows.customIntro = '저장할 혼인서약 소개';
+    vows.narrationOverride = '저장할 혼인서약 직접 대본';
+    pronouncement.customIntro = '저장할 성혼선언 소개';
+    pronouncement.narrationOverride = '저장할 성혼선언 직접 대본';
+    const originals = {
+      vows: {
+        id: vows.id,
+        title: vows.title,
+        sourceId: (vows as typeof vows & { sourceId?: string }).sourceId,
+        order: vows.order,
+      },
+      pronouncement: {
+        id: pronouncement.id,
+        title: pronouncement.title,
+        sourceId: (pronouncement as typeof pronouncement & { sourceId?: string }).sourceId,
+        order: pronouncement.order,
+      },
+    };
+
+    saveDraft(draft);
+    const restored = loadDraft()!;
+    const restoredVows = restored.items.find((item) => item.id === vows.id)!;
+    const restoredPronouncement = restored.items.find((item) => item.id === pronouncement.id)!;
+
+    expect(restoredVows.detailConfig.mode).toBe('mc');
+    expect(restoredPronouncement.detailConfig.speakerMode).toBe('mc');
+    expect(restoredVows.customIntro).toBe(vows.customIntro);
+    expect(restoredVows.narrationOverride).toBe(vows.narrationOverride);
+    expect(restoredPronouncement.customIntro).toBe(pronouncement.customIntro);
+    expect(restoredPronouncement.narrationOverride).toBe(pronouncement.narrationOverride);
+    expect({
+      vows: {
+        id: restoredVows.id,
+        title: restoredVows.title,
+        sourceId: (restoredVows as typeof restoredVows & { sourceId?: string }).sourceId,
+        order: restoredVows.order,
+      },
+      pronouncement: {
+        id: restoredPronouncement.id,
+        title: restoredPronouncement.title,
+        sourceId: (restoredPronouncement as typeof restoredPronouncement & { sourceId?: string }).sourceId,
+        order: restoredPronouncement.order,
+      },
+    }).toEqual(originals);
+  });
+
+  it('통합 출력에서 숨겨진 성혼선언은 미결정 수에 포함하지 않고 해제 시 복원한다', () => {
+    const draft = completeBasic();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    vows.detailConfig = { ...vows.detailConfig, mode: 'mc' };
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'mc' };
+    pronouncement.useDefaultNarration = false;
+    pronouncement.narrationOverride = '';
+    pronouncement.participants = [{ id: 'hidden-empty-person', role: 'speaker', name: '' }];
+
+    expect(validateDraft(draft).filter((issue) => issue.itemId === pronouncement.id)).toHaveLength(0);
+
+    vows.detailConfig = { ...vows.detailConfig, mode: 'together' };
+    expect(validateDraft(draft).filter((issue) => issue.itemId === pronouncement.id).length).toBeGreaterThan(0);
+    expect(pronouncement.useDefaultNarration).toBe(false);
+    expect(pronouncement.participants[0].id).toBe('hidden-empty-person');
+  });
+
+  it('기존 혼인서약 상세 설정 필드로 사회자 진행 상태를 독립 저장한다', () => {
+    const draft = completeBasic();
+    const vows = draft.items.find((item) => item.type === 'vows')!;
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: vows, onChange }));
+
+    fireEvent.click(view.getByRole('checkbox', { name: '혼인서약 사회자 진행' }));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      id: vows.id,
+      detailConfig: expect.objectContaining({ mode: 'mc' }),
+    }));
+    expect(pronouncement.detailConfig.speakerMode).toBe('mc');
+    expect(vows.detailConfig.mode).toBe('together');
+  });
+
+  it('말하기 식순은 기존 speechType으로 덕담과 축사만 선택한다', () => {
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: speech, onChange }));
+    const select = view.getByRole('combobox', { name: '말하기 종류' });
+
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['덕담', '축사']);
+    expect(within(select).queryByRole('option', { name: '축가' })).not.toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'congratulatory' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      id: speech.id,
+      detailConfig: expect.objectContaining({ speechType: 'congratulatory' }),
+    }));
+    view.unmount();
+  });
+
+  it('공연 식순은 기존 performances type으로 축가·축무·축주만 선택한다', () => {
+    const draft = completeBasic();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [{ id: 'performance-choice', type: 'song', performerName: '공연자', samePerformerAsPrevious: false, order: 0 }],
+    };
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: performance, onChange }));
+    const select = view.getByRole('combobox', { name: '공연 종류' });
+
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['축가', '축무', '축주']);
+    expect(within(select).queryByRole('option', { name: '덕담' })).not.toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: '축사' })).not.toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'instrumental' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      id: performance.id,
+      detailConfig: expect.objectContaining({
+        performances: [expect.objectContaining({ id: 'performance-choice', type: 'instrumental' })],
+      }),
+    }));
+    view.unmount();
+  });
+
+  it('성혼선언자 입력은 중립 label과 기존 participant 필드를 재사용한다', () => {
+    const draft = completeBasic();
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'custom' };
+    pronouncement.participants = [];
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: pronouncement, onChange }));
+
+    expect(view.getByRole('combobox', { name: '성혼선언 진행 방식' })).toBeInTheDocument();
+    expect(view.getByRole('textbox', { name: '성혼선언자 이름 또는 호칭' })).toHaveAttribute(
+      'placeholder',
+      '비어 있으면 선택한 관계 호칭을 사용합니다.',
+    );
+    const relationInput = view.getByRole('textbox', { name: '신랑·신부와의 관계' });
+    fireEvent.change(relationInput, { target: { value: '대학 은사' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      id: pronouncement.id,
+      participants: [expect.objectContaining({ role: 'pronouncement_speaker', relation: '대학 은사' })],
+    }));
+    view.unmount();
+  });
+
+  it('speechType·공연 유형·성혼선언자 입력을 같은 Draft schema로 저장·복원한다', () => {
+    localStorage.clear();
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [{ id: 'stored-performance', type: 'dance', performerName: '무용팀', samePerformerAsPrevious: false, order: 0 }],
+    };
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'custom' };
+    pronouncement.participants = [{ id: 'stored-pronouncer', role: 'pronouncement_speaker', name: '박대표님', relation: '직장 상사' }];
+
+    saveDraft(draft);
+    const restored = loadDraft()!;
+
+    expect(restored.items.find((item) => item.id === speech.id)?.detailConfig.speechType).toBe('congratulatory');
+    expect(restored.items.find((item) => item.id === performance.id)?.detailConfig.performances?.[0]).toEqual(
+      expect.objectContaining({ id: 'stored-performance', type: 'dance' }),
+    );
+    expect(restored.items.find((item) => item.id === pronouncement.id)?.participants?.[0]).toEqual(
+      expect.objectContaining({ id: 'stored-pronouncer', name: '박대표님', relation: '직장 상사' }),
+    );
+    expect(JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)!).schemaVersion).toBe(DRAFT_SCHEMA_VERSION);
+  });
+
+  it('작성 시작 전에는 사용자용 1단계 안내 문구를 표시한다', () => {
+    const draft = createDraft();
+    draft.lastStep = 5;
+    const view = render(
+      createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+        draft,
+        setDraft: vi.fn(),
+        saveStatus: 'idle',
+        lastSavedAt: null,
+        compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+      })),
+    );
+
+    expect(view.getByText('필수 입력을 모두 완료하면 사회자용 대본을 확인할 수 있어요.')).toBeInTheDocument();
+    expect(view.queryByText(/차단 항목|MC 읽기 화면/)).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it('작성 진행 중에는 실제 남은 필수 입력 개수를 안내한다', () => {
+    const draft = createDraft();
+    draft.basicInfo.weddingDate = '2026-10-17';
+    draft.lastStep = 5;
+    const remainingCount = validateDraft(draft).filter((issue) => issue.severity === 'blocking').length;
+    const view = render(
+      createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+        draft,
+        setDraft: vi.fn(),
+        saveStatus: 'idle',
+        lastSavedAt: null,
+        compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+      })),
+    );
+
+    expect(view.getByText(`사회자용 대본을 확인하려면 필수 입력 ${remainingCount}개를 더 완료해 주세요.`)).toBeInTheDocument();
+    view.unmount();
+  });
+
+  it('작성 완료 후 완료 안내와 사회자용 대본 열기 링크만 표시한다', () => {
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    const rings = draft.items.find((item) => item.type === 'ring_exchange')!;
+    speech.participants = [{ id: 'speech-complete', role: 'speaker', name: '김지우' }];
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [{
+        id: 'performance-complete',
+        type: 'song',
+        performerName: '이민수',
+        samePerformerAsPrevious: false,
+        order: 0,
+      }],
+    };
+    rings.detailConfig = { ...rings.detailConfig, flowerChildEnabled: false };
+    draft.lastStep = 5;
+    expect(validateDraft(draft).filter((issue) => issue.severity === 'blocking')).toHaveLength(0);
+    const view = render(
+      createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+        draft,
+        setDraft: vi.fn(),
+        saveStatus: 'saved',
+        lastSavedAt: null,
+        compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+      })),
+    );
+
+    expect(view.getByText('준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.')).toBeInTheDocument();
+    expect(view.getByRole('link', { name: '사회자용 대본 열기' })).toBeInTheDocument();
+    expect(view.queryByText(/필수 입력 \d+개를 더 완료/)).not.toBeInTheDocument();
+    view.unmount();
   });
 
   it.each([

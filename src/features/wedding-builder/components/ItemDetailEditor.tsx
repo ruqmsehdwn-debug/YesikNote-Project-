@@ -170,6 +170,17 @@ export function ItemDetailEditor({ item, onChange }: Props) {
         </div>
       )}
 
+      {item.type === 'vows' && (
+        <label className="switch-row bordered">
+          <input
+            type="checkbox"
+            checked={item.detailConfig.mode === 'mc'}
+            onChange={(event) => updateConfig({ mode: event.target.checked ? 'mc' : 'together' })}
+          />
+          혼인서약 사회자 진행
+        </label>
+      )}
+
       {item.type === 'ring_exchange' && item.active && (
         <fieldset className="option-group">
           <legend>화동 설정</legend>
@@ -188,8 +199,13 @@ export function ItemDetailEditor({ item, onChange }: Props) {
 
       {item.type === 'pronouncement' && (
         <div className="form-grid two">
-          <label>진행자<select className={inputClass} value={item.detailConfig.speakerMode ?? 'mc'} onChange={(e) => updateConfig({ speakerMode: e.target.value })}><option value="mc">사회자 대독</option><option value="groom_father">신랑 아버님</option><option value="bride_father">신부 아버님</option><option value="groom_mother">신랑 어머님</option><option value="bride_mother">신부 어머님</option><option value="family_representative">양가 부모님 대표</option><option value="officiant">주례 선생님</option><option value="custom">직접 입력</option></select></label>
-          {item.detailConfig.speakerMode !== 'mc' && <label>이름 또는 호칭<input className={inputClass} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'pronouncement_speaker')} /></label>}
+          <label>성혼선언 진행 방식<select className={inputClass} value={item.detailConfig.speakerMode ?? 'mc'} onChange={(e) => updateConfig({ speakerMode: e.target.value })}><option value="mc">사회자 대독</option><option value="groom_father">신랑 아버님</option><option value="bride_father">신부 아버님</option><option value="groom_mother">신랑 어머님</option><option value="bride_mother">신부 어머님</option><option value="family_representative">양가 부모님 대표</option><option value="officiant">주례 선생님</option><option value="custom">직접 입력</option></select></label>
+          {item.detailConfig.speakerMode !== 'mc' && (
+            <>
+              <label>성혼선언자 이름 또는 호칭<input className={inputClass} placeholder="비어 있으면 선택한 관계 호칭을 사용합니다." value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'pronouncement_speaker')} /></label>
+              <label>신랑·신부와의 관계<input className={inputClass} placeholder="예: 대학 은사" value={participant?.relation ?? ''} onChange={(e) => updateParticipant({ relation: e.target.value }, 'pronouncement_speaker')} /></label>
+            </>
+          )}
         </div>
       )}
 
@@ -202,7 +218,7 @@ export function ItemDetailEditor({ item, onChange }: Props) {
 
       {item.type === 'speech' && (
         <div className="form-grid two">
-          <label>구분<select className={inputClass} value={item.detailConfig.speechType ?? 'words'} onChange={(e) => updateConfig({ speechType: e.target.value })}><option value="words">덕담</option><option value="congratulatory">축사</option></select></label>
+          <label>말하기 종류<select className={inputClass} value={item.detailConfig.speechType ?? 'words'} onChange={(e) => updateConfig({ speechType: e.target.value })}><option value="words">덕담</option><option value="congratulatory">축사</option></select></label>
           <label>진행자 이름 또는 호칭<input className={inputClass} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'speaker')} /></label>
           <label>관계<input className={inputClass} value={participant?.relation ?? ''} onChange={(e) => updateParticipant({ relation: e.target.value }, 'speaker')} /></label>
           <label className="switch-row"><input type="checkbox" checked={!!item.detailConfig.sameAsPronouncement} onChange={(e) => updateConfig({ sameAsPronouncement: e.target.checked })} />성혼선언자와 동일 인물</label>
@@ -263,13 +279,13 @@ function PerformanceEditor({ performances, onChange }: { performances: Performan
   const update = (id: string, patch: Partial<PerformanceItem>) => onChange(performances.map((p) => p.id === id ? { ...p, ...patch } : p));
   return (
     <fieldset className="option-group">
-      <div className="subheading-row"><legend>공연 목록</legend><button type="button" className="text-button" onClick={() => onChange([...performances, { id: createId('performance'), type: 'song', performerName: '', samePerformerAsPrevious: false, order: performances.length }])}>+ 공연 추가</button></div>
+      <div className="subheading-row"><legend>축가·축무·축주 설정</legend><button type="button" className="text-button" onClick={() => onChange([...performances, { id: createId('performance'), type: 'song', performerName: '', samePerformerAsPrevious: false, order: performances.length }])}>+ 공연 추가</button></div>
       {performances.length === 0 && <p className="muted">공연을 진행하려면 공연 항목을 추가해 주세요.</p>}
       {performances.map((performance, index) => (
         <div className="performance-card" key={performance.id}>
           <strong>공연 {index + 1}</strong>
           <div className="form-grid two">
-            <label>유형<select className={inputClass} value={performance.type} onChange={(e) => update(performance.id, { type: e.target.value as PerformanceItem['type'] })}><option value="song">축가</option><option value="dance">축무</option><option value="instrumental">축주</option></select></label>
+            <label>공연 종류<select className={inputClass} value={performance.type} onChange={(e) => update(performance.id, { type: e.target.value as PerformanceItem['type'] })}><option value="song">축가</option><option value="dance">축무</option><option value="instrumental">축주</option></select></label>
             <label>진행자<input className={inputClass} value={performance.performerName} onChange={(e) => update(performance.id, { performerName: e.target.value })} /></label>
             <label>곡명/공연명<input className={inputClass} value={performance.title ?? ''} onChange={(e) => update(performance.id, { title: e.target.value })} /></label>
             <label>관계<input className={inputClass} value={performance.performerRelation ?? ''} onChange={(e) => update(performance.id, { performerRelation: e.target.value })} /></label>

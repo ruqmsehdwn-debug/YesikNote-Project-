@@ -17,15 +17,15 @@ export function ScriptPreview({ script }: { script: ScriptPackage }) {
             <article className="script-preview-card" key={section.id}>
               <span>{index + 1}</span>
               <h3>{section.title}</h3>
-              <p>{section.narration || 'MC 대본 입력이 필요합니다.'}</p>
+              <p className="preview-narration">{section.narration || 'MC 대본 입력이 필요합니다.'}</p>
               {!!section.cue.length && (
-                <div>
+                <div className="preview-support preview-cue">
                   <small>진행 큐</small>
                   <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>
                 </div>
               )}
               {!!section.note.length && (
-                <div>
+                <div className="preview-support preview-note">
                   <small>주의사항 / 실행 메모</small>
                   <ul>{section.note.map((note) => <li key={note}>{note}</li>)}</ul>
                 </div>

@@ -47,7 +47,7 @@ export function McPrompterPage({ draft }: { draft: CeremonyDraft }) {
       <header className="mc-header">
         <div className="mc-brand"><span>예식노트 MC</span><small>읽기 전용 프롬프터</small></div>
         <div className="mc-progress"><span>진행 {currentIndex + 1} / {allSections.length}</span><div><i style={{ width: `${((currentIndex + 1) / allSections.length) * 100}%` }} /></div></div>
-        <div className="mc-now"><small>현재 순서</small><strong>{current.title}</strong></div>
+        <div className="mc-now"><small>현재 순서 <span className="role-badge mc-role-badge" aria-label="현재 화면: 사회자용">사회자용</span></small><strong>{current.title}</strong></div>
         <div className="mc-next"><small>다음 순서</small><strong>{next?.title ?? '예식 종료'}</strong></div>
         <div className="mc-settings">
           <button type="button" onClick={() => updateState({ theme: state.theme === 'dark' ? 'light' : 'dark' })}>{state.theme === 'dark' ? '밝게' : '어둡게'}</button>

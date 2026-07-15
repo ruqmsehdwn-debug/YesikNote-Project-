@@ -34,6 +34,7 @@ a { color: inherit; text-decoration: none; }
 .brand small { color: var(--muted); font-size: 11px; margin-top: 2px; }
 .header-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
 .header-status small { padding-left: 6px; border-left: 1px solid var(--line); }
+.role-badge { display: inline-flex; align-items: center; border: 1px solid #c9d8e1; border-radius: 999px; padding: 4px 9px; background: var(--blue-soft); color: var(--navy-2); font-size: 10px; font-weight: 800; line-height: 1; white-space: nowrap; }
 .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #a8b0b7; }
 .save-dot.saving { background: #e4a641; animation: pulse 1s infinite; }
 .save-dot.saved { background: #3d9b72; }
@@ -124,9 +125,12 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
 .preview-scroll { overflow: auto; max-height: calc(100vh - 240px); padding-right: 5px; display: grid; gap: 10px; }
 .script-preview-card { border: 1px solid #e0e0da; border-radius: 12px; padding: 14px 14px 14px 45px; position: relative; background: white; }
 .script-preview-card > span { position: absolute; left: 13px; top: 14px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--navy); color: white; font-size: 10px; }
-.script-preview-card h3 { font-size: 13px; margin: 0 0 8px; color: var(--navy); }
-.script-preview-card p { white-space: pre-line; color: #56616b; font-size: 11px; line-height: 1.65; margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.script-preview-card small { color: #467696; display: block; margin-top: 8px; }
+.script-preview-card h3 { font-size: 15px; margin: 0 0 10px; color: var(--navy); }
+.script-preview-card .preview-narration { white-space: pre-line; overflow-wrap: anywhere; color: #3f4d58; font-size: 17px; line-height: 1.65; margin: 0; }
+.script-preview-card .preview-support { color: #64727d; font-size: 13px; line-height: 1.5; }
+.script-preview-card .preview-support small { color: #467696; display: block; margin-top: 12px; font-weight: 700; }
+.script-preview-card .preview-support ul { margin: 6px 0 0; padding-left: 18px; }
+.script-preview-card .preview-support li { margin: 3px 0; }
 
 .detail-layout { display: grid; gap: 16px; }
 .detail-rail { background: var(--navy); border-radius: 14px; padding: 14px 18px; }
@@ -192,6 +196,8 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
 .mc-progress i { display: block; height: 100%; background: #67a8d1; }
 .mc-now, .mc-next { border-left: 1px solid var(--mc-line); padding-left: 16px; }
 .mc-now strong, .mc-next strong { font-size: 14px; margin-top: 3px; }
+.mc-now small .mc-role-badge { display: inline-flex; margin-left: 6px; border-color: #36566c; background: #1a3548; color: #a9d5ef; vertical-align: middle; }
+.light .mc-now small .mc-role-badge { border-color: #bfd6e4; background: #e7f3fa; color: #285a77; }
 .mc-next strong { color: var(--mc-muted); }
 .mc-settings { display: flex; gap: 6px; }
 .mc-settings button, .mc-settings select { border: 1px solid var(--mc-line); background: var(--mc-card); color: inherit; border-radius: 8px; padding: 8px; font-size: 10px; }
@@ -244,6 +250,8 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
   .heading-actions { margin: -10px 0 22px; }
   .heading-actions .button { flex: 1; }
   .item-card { align-items: flex-start; flex-wrap: wrap; padding: 9px; }
+  .script-preview-card .preview-narration { font-size: 16px; }
+  .script-preview-card .preview-support { font-size: 13px; }
   .drag-handle { display: none; }
   .item-main { min-height: 42px; }
   .item-actions { width: 100%; display: grid; grid-template-columns: repeat(5, 1fr); }

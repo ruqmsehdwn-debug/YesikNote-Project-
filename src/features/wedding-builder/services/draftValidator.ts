@@ -13,6 +13,13 @@ function activeTree(items: CeremonyItem[]) {
 
 export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const combinedMcLedVows = draft.items.some(
+    (item) => item.active && item.type === 'vows' && item.detailConfig.mode === 'mc',
+  ) && draft.items.some(
+    (item) => item.active
+      && item.type === 'pronouncement'
+      && item.detailConfig.speakerMode === 'mc',
+  );
   const requiredBasic = [
     ['weddingDate', draft.basicInfo.weddingDate, '예식일을 입력해 주세요.'],
     ['groomName', draft.basicInfo.groomName, '신랑 이름을 입력해 주세요.'],
@@ -38,6 +45,8 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
   }
 
   activeTree(draft.items).forEach((item) => {
+    if (combinedMcLedVows && item.type === 'pronouncement') return;
+
     if (item.type === 'custom') {
       if (!item.title.trim()) {
         issues.push({

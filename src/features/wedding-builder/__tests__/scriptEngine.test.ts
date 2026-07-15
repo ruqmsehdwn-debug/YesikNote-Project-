@@ -7,6 +7,7 @@ import type { CeremonyDraft, CeremonyItem } from '../models/ceremony';
 import { OwnerBuilderPage } from '../pages/OwnerBuilderPage';
 import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngine';
 import { McPrompterPage } from '../../mc-prompter/pages/McPrompterPage';
+import { ScriptPreview } from '../components/ScriptPreview';
 
 function filledDraft(type: CeremonyDraft['ceremonyType'] = 'no_officiant') {
   const draft = createDraft(type);
@@ -25,6 +26,9 @@ function filledDraft(type: CeremonyDraft['ceremonyType'] = 'no_officiant') {
 
 const section = (draft: CeremonyDraft, type: string) =>
   generateScript(draft).ceremonySections.find((item) => item.id === draft.items.find((source) => source.type === type)?.id);
+
+const sourceIdOf = (item: CeremonyItem) =>
+  (item as CeremonyItem & { sourceId?: string }).sourceId;
 
 function ownerPage(draft: CeremonyDraft) {
   return createElement(
@@ -56,6 +60,41 @@ function advancePastChecklist(view: ReturnType<typeof render>) {
   fireEvent.click(view.getByRole('button', { name: '완료' }));
 }
 
+const mcLedVowsNarration = [
+  '이제 두 사람의 사랑의 약속인 혼인서약이 있겠습니다.',
+  '오늘은 특별히 제가 두 분에게 사랑의 서약인 혼인서약을 진행하겠습니다.',
+  '[혼인서약 낭독]',
+  '두 사람의 소중한 약속에 축복의 박수 부탁드립니다.',
+].join('\n');
+
+const mcLedPronouncementNarration = [
+  '이제 두 사람이 완전한 부부가 되었음을 선언하는 성혼선언이 있겠습니다.',
+  '오늘은 제가 내빈 여러분을 대신해 두 분이 완전한 부부가 되었음을 선언하겠습니다.',
+  '[성혼선언 낭독]',
+  '두 사람에게 다시 한번 축복의 박수 부탁드립니다.',
+].join('\n');
+
+const combinedVowsPronouncementNarration = [
+  '이제 다음은 두 사람의 사랑의 약속인 혼인서약과, 완전한 부부가 되었음을 선언하는 성혼선언이 있겠습니다.',
+  '오늘은 제가 내빈 여러분을 대신해 두 분에게 서약과 선언을 진행하겠습니다.',
+  '[혼인서약 및 성혼선언 낭독]',
+  '두 사람에게 다시 한번 축복의 박수 부탁드립니다.',
+].join('\n');
+
+function configureMcLedItems(draft: CeremonyDraft, vowsMc: boolean, pronouncementMc: boolean) {
+  const vows = draft.items.find((item) => item.type === 'vows')!;
+  const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+  vows.detailConfig = { ...vows.detailConfig, mode: vowsMc ? 'mc' : 'together' };
+  pronouncement.detailConfig = {
+    ...pronouncement.detailConfig,
+    speakerMode: pronouncementMc ? 'mc' : 'groom_father',
+  };
+  if (!pronouncementMc) {
+    pronouncement.participants = [{ id: 'pronouncer', role: 'speaker', name: '신랑 아버님' }];
+  }
+  return { vows, pronouncement };
+}
+
 describe('scriptEngine', () => {
   it('식전 안내를 15/10/5분 세 번 만들고 피로연 장소를 말하지 않는다', () => {
     const result = generateScript(filledDraft());
@@ -79,6 +118,75 @@ describe('scriptEngine', () => {
     expect(section(draft, 'groom_entrance')?.narration).toContain('신랑, 입장!');
     groom.detailConfig.mode = 'with_father';
     expect(section(draft, 'groom_entrance')?.narration).toContain('신랑과 아버님, 입장!');
+  });
+
+  it('신랑 단독입장은 신랑 전용 Cue와 Note만 생성한다', () => {
+    const draft = filledDraft();
+    const groom = draft.items.find((item) => item.type === 'groom_entrance')!;
+    groom.detailConfig = { ...groom.detailConfig, mode: 'solo' };
+    const result = section(draft, 'groom_entrance')!;
+
+    expect(result.cue).toEqual(expect.arrayContaining([
+      '신랑 대기 확인',
+      '신랑 입장 동선 확인',
+      '신랑 입장곡 준비 확인',
+      '신랑 입장 Cue 확인',
+      '단상 위치 도착 확인',
+    ]));
+    expect(result.cue.join(' ')).not.toMatch(/아버님|동반자|동행 종료|인계/);
+    expect(result.note).toEqual(['신랑 입장 동선과 단상 도착 Cue를 확인합니다.']);
+  });
+
+  it('신랑 아버님 동반입장은 실제 동반자 Cue와 Note를 생성한다', () => {
+    const draft = filledDraft();
+    const groom = draft.items.find((item) => item.type === 'groom_entrance')!;
+    groom.detailConfig = { ...groom.detailConfig, mode: 'with_father' };
+    const result = section(draft, 'groom_entrance')!;
+
+    expect(result.cue).toEqual(expect.arrayContaining([
+      '신랑·아버님 대기 확인',
+      '신랑 입장 동선 확인',
+      '아버님 보행 속도 확인',
+      '동행 종료 지점 확인',
+      '신랑 입장곡 준비 확인',
+      '동반 입장 Cue 확인',
+      '단상 위치 도착 확인',
+    ]));
+    expect(result.note.join(' ')).toContain('신랑 아버님의 보행 속도와 동행 종료 지점');
+  });
+
+  it('신랑 직접 구성 입장은 특정 동반자를 추측하지 않는다', () => {
+    const draft = filledDraft();
+    const groom = draft.items.find((item) => item.type === 'groom_entrance')!;
+    groom.detailConfig = { ...groom.detailConfig, mode: 'custom' };
+    const result = section(draft, 'groom_entrance')!;
+
+    expect(result.narration).not.toContain('아버님');
+    expect(result.cue).toContain('신랑과 동반자 대기 확인');
+    expect(result.cue.join(' ')).not.toContain('아버님');
+    expect(result.note).toContain('동반자의 보행 속도와 동행 종료 지점을 확인합니다.');
+  });
+
+  it('Owner 실시간 미리보기와 MC가 같은 신랑 입장 Cue와 Note를 표시한다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    draft.lastStep = 3;
+    const groom = moveItemFirst(draft, 'groom_entrance');
+    groom.detailConfig = { ...groom.detailConfig, mode: 'solo' };
+
+    const ownerView = render(ownerPage(draft));
+    const ownerCard = ownerView.getByRole('heading', { name: '신랑 입장' }).closest('article')!;
+    expect(ownerCard.textContent).toContain('신랑 대기 확인');
+    expect(ownerCard.textContent).toContain('신랑 입장 동선과 단상 도착 Cue를 확인합니다.');
+    expect(ownerCard.textContent).not.toContain('아버님');
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-cue')?.textContent).toContain('신랑 대기 확인');
+    expect(mcView.container.querySelector('.mc-note')?.textContent).toContain('신랑 입장 동선과 단상 도착 Cue를 확인합니다.');
+    expect(mcView.container.querySelector('.mc-cue')?.textContent).not.toContain('아버님');
+    mcView.unmount();
   });
 
   it.each([
@@ -107,6 +215,52 @@ describe('scriptEngine', () => {
     speech.detailConfig = { ...speech.detailConfig, speechType };
     expect(ceremonyItemDisplayTitle(speech)).toBe(expected);
     expect(section(draft, 'speech')?.title).toBe(expected);
+  });
+
+  it.each([
+    ['song', '축가'],
+    ['dance', '축무'],
+    ['instrumental', '축주'],
+  ] as const)('공연 유형 %s의 사용자 표시명을 %s로 만든다', (performanceType, expected) => {
+    const draft = filledDraft();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    const stored = { id: performance.id, title: performance.title };
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [{
+        id: `performance-${performanceType}`,
+        type: performanceType,
+        performerName: '공연자',
+        samePerformerAsPrevious: false,
+        order: 0,
+      }],
+    };
+
+    expect(ceremonyItemDisplayTitle(performance)).toBe(expected);
+    expect(section(draft, 'performance')?.title).toBe(expected);
+    expect(ceremonyItemDisplayTitle(performance)).not.toMatch(/덕담|축사/);
+    expect({ id: performance.id, title: performance.title }).toEqual(stored);
+  });
+
+  it('여러 공연 유형은 실제 의미 순서로 표시하고 말하기 식순과 섞지 않는다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [
+        { id: 'dance-first', type: 'dance', performerName: '무용팀', samePerformerAsPrevious: false, order: 0 },
+        { id: 'song-second', type: 'song', performerName: '친구', samePerformerAsPrevious: false, order: 1 },
+      ],
+    };
+    draft.items = [...draft.items].reverse().map((item, order) => ({ ...item, order }));
+
+    const result = generateScript(draft).ceremonySections;
+    expect(result.find((item) => item.id === speech.id)?.title).toBe('축사');
+    expect(result.find((item) => item.id === performance.id)?.title).toBe('축무/축가');
+    expect(result.find((item) => item.id === speech.id)?.title).not.toContain('축가');
+    expect(result.find((item) => item.id === performance.id)?.title).not.toMatch(/덕담|축사/);
   });
 
   it('복제 표시명을 계산해도 안정 ID와 저장 title은 바꾸지 않는다', () => {
@@ -142,6 +296,24 @@ describe('scriptEngine', () => {
     expect(mcView.container.textContent).not.toContain('복사본');
     expect(speech.title).toBe(storedTitle);
     mcView.unmount();
+  });
+
+  it('혼인서약·성혼선언 통합으로 번호가 바뀌어도 speech와 performance 의미를 ID/type으로 유지한다', () => {
+    const draft = filledDraft();
+    configureMcLedItems(draft, true, true);
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    performance.detailConfig = {
+      ...performance.detailConfig,
+      performances: [{ id: 'combined-dance', type: 'dance', performerName: '무용팀', samePerformerAsPrevious: false, order: 0 }],
+    };
+
+    const result = generateScript(draft).ceremonySections;
+    expect(result.find((item) => item.id === speech.id)?.title).toBe('축사');
+    expect(result.find((item) => item.id === performance.id)?.title).toBe('축무');
+    expect(result.filter((item) => item.title === '혼인서약 및 성혼선언')).toHaveLength(1);
+    expect(result.some((item) => item.id === draft.items.find((item) => item.type === 'pronouncement')?.id)).toBe(false);
   });
 
   it('신부 단독입장은 신부 전용 Cue와 Note만 생성한다', () => {
@@ -277,6 +449,260 @@ describe('scriptEngine', () => {
     advancePastChecklist(mcView);
     const mcText = mcView.container.querySelector('.mc-narration')?.textContent ?? '';
     expect(mcText.indexOf(vows.customIntro)).toBeLessThan(mcText.indexOf(vows.narrationOverride));
+    mcView.unmount();
+  });
+
+  it('축사 소개 멘트를 기본 본문 앞에 원문 그대로 출력한다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '신부의 오랜 친구가 준비한 축사를 소개합니다.';
+    speech.participants = [{ id: 'speech-person', role: 'speaker', name: '김지우' }];
+    const narration = section(draft, 'speech')!.narration;
+
+    expect(narration.startsWith(speech.customIntro)).toBe(true);
+    expect(narration).toContain('김지우');
+    expect(narration.match(/신부의 오랜 친구가 준비한 축사를 소개합니다\./g)).toHaveLength(1);
+  });
+
+  it('모든 식순의 소개 멘트는 override 앞에 출력하고 기본 본문을 중복하지 않는다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '축사 소개 원문';
+    speech.narrationOverride = '축사 사용자 수정 본문';
+
+    expect(section(draft, 'speech')?.narration).toBe('축사 소개 원문\n축사 사용자 수정 본문');
+    expect(section(draft, 'speech')?.narration).not.toContain('축사를 진행해 주실');
+
+    const opening = draft.items.find((item) => item.type === 'opening')!;
+    const defaultOpeningNarration = section(draft, 'opening')!.narration;
+    opening.customIntro = '   ';
+    expect(section(draft, 'opening')?.narration).toBe(defaultOpeningNarration);
+    expect(section(draft, 'opening')?.narration).not.toContain('\n\n');
+  });
+
+  it('축사 소개 멘트가 Owner 미리보기·최종 확인·MC에 동일하게 출력된다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    const speech = moveItemFirst(draft, 'speech');
+    speech.customIntro = '세 화면에 표시할 축사 소개 멘트';
+    speech.narrationOverride = '세 화면에 표시할 축사 본문';
+
+    draft.lastStep = 3;
+    const previewView = render(ownerPage(draft));
+    expect(previewView.container.querySelector('.preview-panel')?.textContent).toContain(speech.customIntro);
+    previewView.unmount();
+
+    draft.lastStep = 5;
+    const reviewView = render(ownerPage(draft));
+    expect(reviewView.container.textContent).toContain(speech.customIntro);
+    reviewView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).toContain(speech.customIntro);
+    mcView.unmount();
+  });
+
+  it('실시간 미리보기는 대본·진행 큐·주의사항을 별도 class로 구분한다', () => {
+    const script = generateScript(filledDraft());
+    const view = render(createElement(ScriptPreview, { script }));
+
+    expect(view.container.querySelector('.script-preview-card .preview-narration')).toBeInTheDocument();
+    expect(view.container.querySelector('.script-preview-card .preview-cue')).toBeInTheDocument();
+    expect(view.container.querySelector('.script-preview-card .preview-note')).toBeInTheDocument();
+    expect(view.container.querySelector('.preview-narration')?.classList.contains('preview-support')).toBe(false);
+    view.unmount();
+  });
+
+  it('성혼선언자 정보가 없으면 특정 가족관계를 추측하지 않고 중립 표현을 사용한다', () => {
+    const draft = filledDraft();
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'custom' };
+    pronouncement.participants = [];
+    const result = section(draft, 'pronouncement')!;
+
+    expect(result.narration).toContain('성혼선언자께서');
+    expect(result.narration).not.toMatch(/신랑 아버님|신부 아버님|신랑 어머님|신부 어머님/);
+    expect(result.cue.join(' ')).not.toMatch(/신랑 아버님|신부 아버님/);
+    expect(result.note.join(' ')).not.toMatch(/신랑 아버님|신부 아버님/);
+  });
+
+  it('명시적으로 선택하거나 입력한 성혼선언자 정보만 대본에 반영한다', () => {
+    const draft = filledDraft();
+    const pronouncement = draft.items.find((item) => item.type === 'pronouncement')!;
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'groom_father' };
+    pronouncement.participants = [];
+    expect(section(draft, 'pronouncement')?.narration).toContain('신랑 아버님께서');
+
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'custom' };
+    pronouncement.participants = [{ id: 'relation-speaker', role: 'pronouncement_speaker', name: '', relation: '대학 은사' }];
+    expect(section(draft, 'pronouncement')?.narration).toContain('대학 은사께서');
+
+    pronouncement.participants = [{ ...pronouncement.participants[0], name: '김대표님' }];
+    expect(section(draft, 'pronouncement')?.narration).toContain('김대표님께서');
+    expect(section(draft, 'pronouncement')?.narration).not.toContain('대학 은사께서');
+  });
+
+  it('성혼선언자 입력값을 Owner 미리보기와 MC가 동일하게 사용한다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    draft.lastStep = 3;
+    const pronouncement = moveItemFirst(draft, 'pronouncement');
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'custom' };
+    pronouncement.participants = [{ id: 'owner-mc-pronouncer', role: 'pronouncement_speaker', name: '박대표님', relation: '직장 상사' }];
+
+    const ownerView = render(ownerPage(draft));
+    const ownerCard = ownerView.getByRole('heading', { name: '성혼선언' }).closest('article')!;
+    expect(ownerCard.textContent).toContain('박대표님께서');
+    expect(ownerCard.textContent).not.toContain('신랑 아버님');
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).toContain('박대표님께서');
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).not.toContain('신랑 아버님');
+    mcView.unmount();
+  });
+
+  it('혼인서약·성혼선언 모두 사회자 진행이 아니면 기존 별도 식순을 유지한다', () => {
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, false, false);
+    const result = generateScript(draft).ceremonySections;
+
+    expect(result.find((item) => item.id === vows.id)?.title).toBe(vows.title);
+    expect(result.some((item) => item.id === pronouncement.id)).toBe(true);
+    expect(result.some((item) => item.title === '혼인서약 및 성혼선언')).toBe(false);
+    expect(result.map((item) => item.narration).join('\n')).not.toContain('사회자가 진행합니다.');
+  });
+
+  it('혼인서약만 사회자 진행이면 승인 대본과 별도 성혼선언을 출력한다', () => {
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, true, false);
+    const result = generateScript(draft).ceremonySections;
+
+    expect(result.find((item) => item.id === vows.id)?.narration).toBe(mcLedVowsNarration);
+    expect(result.some((item) => item.id === pronouncement.id)).toBe(true);
+    expect(result.map((item) => item.narration).join('\n')).not.toContain('사회자가 진행합니다.');
+  });
+
+  it('성혼선언만 사회자 진행이면 승인 대본과 별도 혼인서약을 출력한다', () => {
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, false, true);
+    const result = generateScript(draft).ceremonySections;
+
+    expect(result.some((item) => item.id === vows.id)).toBe(true);
+    expect(result.find((item) => item.id === pronouncement.id)?.narration).toBe(mcLedPronouncementNarration);
+    expect(result.map((item) => item.narration).join('\n')).not.toContain('사회자가 진행합니다.');
+  });
+
+  it('둘 다 사회자 진행이면 승인된 통합 제목·대본을 한 번만 출력한다', () => {
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, true, true);
+    const original = draft.items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      order: item.order,
+      active: item.active,
+      sourceId: sourceIdOf(item),
+    }));
+    const separateTopLevelCount = draft.items.filter((item) => item.active).length;
+    const result = generateScript(draft).ceremonySections;
+    const combined = result.find((item) => item.id === vows.id)!;
+
+    expect(combined.title).toBe('혼인서약 및 성혼선언');
+    expect(combined.narration).toBe(combinedVowsPronouncementNarration);
+    expect(combined.narration).toContain('두 분에게 서약과 선언');
+    expect(combined.narration).not.toContain('두 분의 서약과 선언');
+    expect(result.some((item) => item.id === pronouncement.id)).toBe(false);
+    expect(result.filter((item) => item.title === '혼인서약 및 성혼선언')).toHaveLength(1);
+    expect(result.filter((item) => !item.parentId)).toHaveLength(separateTopLevelCount - 1);
+    expect(draft.items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      order: item.order,
+      active: item.active,
+      sourceId: sourceIdOf(item),
+    }))).toEqual(original);
+  });
+
+  it('통합 상태에서 Owner 미리보기와 최종 확인에 별도 성혼선언을 중복 표시하지 않는다', () => {
+    const draft = filledDraft();
+    configureMcLedItems(draft, true, true);
+
+    draft.lastStep = 3;
+    const previewView = render(ownerPage(draft));
+    expect(previewView.getAllByRole('heading', { name: '혼인서약 및 성혼선언' })).toHaveLength(1);
+    expect(previewView.queryByRole('heading', { name: '성혼선언' })).not.toBeInTheDocument();
+    previewView.unmount();
+
+    draft.lastStep = 5;
+    const reviewView = render(ownerPage(draft));
+    expect(reviewView.getAllByRole('heading', { name: '혼인서약 및 성혼선언' })).toHaveLength(1);
+    expect(reviewView.queryByRole('heading', { name: '성혼선언' })).not.toBeInTheDocument();
+    reviewView.unmount();
+  });
+
+  it('통합 계산은 직접 수정 대본을 보존하고 체크 해제 시 원본 두 식순을 복원한다', () => {
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, true, true);
+    vows.customIntro = '혼인서약 소개';
+    vows.narrationOverride = '혼인서약 직접 수정 대본';
+    pronouncement.customIntro = '성혼선언 소개';
+    pronouncement.narrationOverride = '성혼선언 직접 수정 대본';
+    const stored = {
+      vows: { id: vows.id, title: vows.title, sourceId: sourceIdOf(vows), narrationOverride: vows.narrationOverride },
+      pronouncement: { id: pronouncement.id, title: pronouncement.title, sourceId: sourceIdOf(pronouncement), narrationOverride: pronouncement.narrationOverride },
+    };
+
+    const combined = generateScript(draft).ceremonySections.find((item) => item.id === vows.id)!;
+    expect(combined.narration).toBe([
+      '혼인서약 소개',
+      '혼인서약 직접 수정 대본',
+      '성혼선언 소개',
+      '성혼선언 직접 수정 대본',
+    ].join('\n'));
+
+    pronouncement.detailConfig = { ...pronouncement.detailConfig, speakerMode: 'groom_father' };
+    pronouncement.participants = [{ id: 'pronouncer-restore', role: 'speaker', name: '신랑 아버님' }];
+    const restored = generateScript(draft).ceremonySections;
+    expect(restored.some((item) => item.id === vows.id)).toBe(true);
+    expect(restored.some((item) => item.id === pronouncement.id)).toBe(true);
+    expect({
+      vows: { id: vows.id, title: vows.title, sourceId: sourceIdOf(vows), narrationOverride: vows.narrationOverride },
+      pronouncement: { id: pronouncement.id, title: pronouncement.title, sourceId: sourceIdOf(pronouncement), narrationOverride: pronouncement.narrationOverride },
+    }).toEqual(stored);
+  });
+
+  it('MC 실행 목록은 통합 식순을 한 번만 사용하고 완료·다음 동작을 유지한다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    const { vows, pronouncement } = configureMcLedItems(draft, true, true);
+    moveItemFirst(draft, 'vows');
+    const view = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+
+    advancePastChecklist(view);
+    expect(view.container.querySelector('.mc-now strong')?.textContent).toBe('혼인서약 및 성혼선언');
+    expect(view.container.textContent?.match(/혼인서약 및 성혼선언/g)?.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(view.getByRole('button', { name: '완료' }));
+    expect(view.container.querySelector('.mc-now strong')?.textContent).not.toBe('성혼선언');
+    expect(generateScript(draft).ceremonySections.some((item) => item.id === pronouncement.id)).toBe(false);
+    expect(draft.items.some((item) => item.id === vows.id)).toBe(true);
+    expect(draft.items.some((item) => item.id === pronouncement.id)).toBe(true);
+    view.unmount();
+  });
+
+  it('Owner와 MC에 읽기 전용 화면 용도 배지를 표시한다', () => {
+    const draft = filledDraft();
+    const ownerView = render(ownerPage(draft));
+    const ownerBadge = ownerView.getByLabelText('현재 화면: 신랑·신부용');
+    expect(ownerBadge).toHaveTextContent('신랑·신부용');
+    expect(ownerBadge.closest('a, button')).toBeNull();
+    ownerView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    const mcBadge = mcView.getByLabelText('현재 화면: 사회자용');
+    expect(mcBadge).toHaveTextContent('사회자용');
+    expect(mcBadge.closest('a, button')).toBeNull();
     mcView.unmount();
   });
 

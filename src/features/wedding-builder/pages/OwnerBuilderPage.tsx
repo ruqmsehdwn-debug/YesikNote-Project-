@@ -93,6 +93,7 @@ export function OwnerBuilderPage({
           <span><strong>예식노트</strong><small>Owner Script Builder</small></span>
         </Link>
         <div className="header-status">
+          <span className="role-badge" aria-label="현재 화면: 신랑·신부용">신랑·신부용</span>
           <span className={`save-dot ${saveStatus}`} />
           <span>{saveStatus === 'saving' ? '저장 중' : saveStatus === 'failed' ? '저장 실패' : saveStatus === 'saved' ? '저장됨' : '자동 저장'}</span>
           {lastSavedAt && <small>{new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</small>}
@@ -175,7 +176,7 @@ export function OwnerBuilderPage({
           <div className="step-controls">
             <button type="button" className="button secondary" disabled={step === 1} onClick={() => setStep(step - 1)}>이전</button>
             {step < 5 && <button type="button" className="button primary" onClick={() => setStep(step + 1)}>다음 단계</button>}
-            {step === 5 && blocking.length === 0 && <Link className="button primary" to="/mc">MC 화면에서 확인</Link>}
+            {step === 5 && blocking.length === 0 && <Link className="button primary" to="/mc">사회자용 대본 열기</Link>}
           </div>
         </section>
         {step >= 3 && step <= 4 && <ScriptPreview script={script} />}
@@ -244,14 +245,24 @@ function OrderStep({ draft, selectedId, onItemsChange, onSelect, onToggle, onDup
 
 function EmptyCustom({ onAdd }: { onAdd: () => void }) { return <div className="empty-state"><span className="empty-icon">＋</span><strong>직접 구성할 첫 식순을 추가해 주세요</strong><p>기본 대본은 생성되지 않으며 MC 대본을 직접 입력합니다.</p><button type="button" className="button primary" onClick={onAdd}>자유 식순 추가</button></div>; }
 
+function reviewGuidance(rate: number, remainingCount: number) {
+  if (rate === 0) return '필수 입력을 모두 완료하면 사회자용 대본을 확인할 수 있어요.';
+  if (remainingCount > 0) {
+    return `사회자용 대본을 확인하려면 필수 입력 ${remainingCount}개를 더 완료해 주세요.`;
+  }
+  return '준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.';
+}
+
 function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (id: string) => void }) {
+  const rate = completionRate(draft);
+  const activeOutputCount = script.ceremonySections.filter((section) => !section.parentId).length;
   return (
     <div className="page-section">
-      <div className="page-heading"><span className="section-kicker">STEP 5</span><h1>최종 대본을 확인하세요</h1><p>차단 항목을 모두 해결하면 MC 읽기 화면을 열 수 있습니다.</p></div>
-      <div className="review-summary"><div><span>활성 식순</span><strong>{draft.items.filter((item) => item.active).length}</strong></div><div><span>대본 섹션</span><strong>{script.ceremonySections.length}</strong></div><div><span>예상 시간</span><strong>{Math.ceil(script.totalEstimatedTimeSeconds / 60)}분</strong></div><div><span>완료 상태</span><strong className={blocking.length ? 'text-danger' : 'text-success'}>{blocking.length ? `미결정 ${blocking.length}` : '확인 완료'}</strong></div></div>
+      <div className="page-heading"><span className="section-kicker">STEP 5</span><h1>최종 대본을 확인하세요</h1><p>{reviewGuidance(rate, blocking.length)}</p></div>
+      <div className="review-summary"><div><span>활성 식순</span><strong>{activeOutputCount}</strong></div><div><span>대본 섹션</span><strong>{script.ceremonySections.length}</strong></div><div><span>예상 시간</span><strong>{Math.ceil(script.totalEstimatedTimeSeconds / 60)}분</strong></div><div><span>완료 상태</span><strong className={blocking.length ? 'text-danger' : 'text-success'}>{blocking.length ? `미결정 ${blocking.length}` : '확인 완료'}</strong></div></div>
       {!!blocking.length && <IssueList title="완료 전 확인이 필요해요" issues={blocking} onEdit={onEdit} />}
       {!!warnings.length && <IssueList title="순서를 한번 확인해 주세요" issues={warnings} onEdit={onEdit} warning />}
-      {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다. MC 화면에서 실제 진행 순서와 대본을 확인할 수 있습니다.</div>}
+      {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다.</div>}
       {draft.basicInfo.globalRequestNote && <div className="global-note"><span>전체 요청사항</span><p>{draft.basicInfo.globalRequestNote}</p></div>}
       <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>}{!!section.note.length && <div className="inline-note"><strong>주의사항 / 실행 메모</strong>{section.note.join(' · ')}</div>}</div></article>)}</div>
     </div>
