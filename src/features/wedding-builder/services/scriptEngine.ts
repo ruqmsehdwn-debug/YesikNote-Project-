@@ -10,6 +10,16 @@ import { withParticle } from '../utils/koreanParticle';
 const lines = (...values: Array<string | undefined | false>) =>
   values.filter(Boolean).join('\n');
 
+const INTRO_OMISSION_VALUES = new Set(['없음', '없어요', '해당 없음', '해당없음', '-']);
+
+export type IntroPresentationMode = 'auto' | 'custom' | 'omit';
+
+export function introPresentationMode(value?: string): IntroPresentationMode {
+  if (INTRO_OMISSION_VALUES.has(value?.trim() ?? '')) return 'omit';
+  if (value === undefined || value === '') return 'auto';
+  return 'custom';
+}
+
 const MC_LED_VOWS_NARRATION = lines(
   '이제 두 사람의 사랑의 약속인 혼인서약이 있겠습니다.',
   '오늘은 특별히 제가 두 분에게 사랑의 서약인 혼인서약을 진행하겠습니다.',
@@ -35,6 +45,89 @@ const personLabel = (item: CeremonyItem, fallback = '') => {
   const person = item.detailConfig.speaker ?? item.participants?.[0];
   return person?.displayTitle || person?.name || fallback;
 };
+
+function personNameWithHonorific(value: string): string {
+  return /(?:님|선생님|대표님|아버님|어머님)$/.test(value) ? value : `${value} 님`;
+}
+
+function normalizedNames(value: string): string {
+  return value
+    .split(/[,\n]+/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .join('·');
+}
+
+function normalizedSpeechRelation(value?: string): string {
+  const relation = value?.trim() ?? '';
+  if (!relation) return '';
+  const compact = relation.replace(/\s+/g, '');
+  const familyRoles: Record<string, string> = {
+    '신랑님의아버님': '신랑 아버님',
+    '신랑의아버님': '신랑 아버님',
+    '신랑아버님': '신랑 아버님',
+    '신랑아버지': '신랑 아버님',
+    '신랑님의어머님': '신랑 어머님',
+    '신랑의어머님': '신랑 어머님',
+    '신랑어머님': '신랑 어머님',
+    '신랑어머니': '신랑 어머님',
+    '신부님의아버님': '신부 아버님',
+    '신부의아버님': '신부 아버님',
+    '신부아버님': '신부 아버님',
+    '신부아버지': '신부 아버님',
+    '신부님의어머님': '신부 어머님',
+    '신부의어머님': '신부 어머님',
+    '신부어머님': '신부 어머님',
+    '신부어머니': '신부 어머님',
+  };
+  const familyRole = familyRoles[compact];
+  if (familyRole) return familyRole;
+  if (relation.endsWith('아버지')) return `${relation.slice(0, -3)}아버님`;
+  if (relation.endsWith('어머니')) return `${relation.slice(0, -3)}어머님`;
+  if (relation.endsWith('대표')) return `${relation}님`;
+  if (relation.endsWith('선생')) return `${relation}님`;
+  return relation;
+}
+
+function speechSpeakerDescription(nameValue: string, relationValue?: string): string {
+  const name = normalizedNames(nameValue);
+  const relation = normalizedSpeechRelation(relationValue);
+  if (!name) return relation;
+  const namedSpeaker = personNameWithHonorific(name);
+  if (!relation || relation.replace(/\s+/g, '') === name.replace(/\s+/g, '')) return namedSpeaker;
+  if (/(?:아버님|어머님|대표님|선생님)$/.test(relation)) return `${relation}이신 ${namedSpeaker}`;
+  return `${relation} ${namedSpeaker}`;
+}
+
+function performancePresenter(performance: PerformanceItem): string {
+  const name = normalizedNames(performance.performerName);
+  const relation = performance.performerRelation?.trim() ?? '';
+  if (name && relation) return `${relation}인 ${personNameWithHonorific(name)}`;
+  if (name) return personNameWithHonorific(name);
+  if (!relation) return '';
+  return /(?:님|분|분들|선생님)$/.test(relation) ? relation : `${relation}분`;
+}
+
+export function generatedIntroForItem(item: CeremonyItem): string {
+  if (item.type !== 'speech') return '';
+  const person = item.detailConfig.speaker ?? item.participants?.[0];
+  const speaker = speechSpeakerDescription(person?.displayTitle || person?.name || '', person?.relation);
+  if (!speaker) return '';
+  const kind = item.detailConfig.speechType === 'congratulatory' ? '축사' : '덕담';
+  if (kind === '덕담' && item.detailConfig.sameAsPronouncement) {
+    return `이어서 ${speaker}께서 두 사람에게 덕담을 해 주시도록 하겠습니다.`;
+  }
+  return kind === '축사'
+    ? `다음은 ${speaker}의 축사가 있겠습니다.`
+    : `다음은 ${speaker}께서 준비하신 덕담이 있겠습니다.`;
+}
+
+export function resolvedIntroForItem(item: CeremonyItem): string {
+  const mode = introPresentationMode(item.customIntro);
+  if (mode === 'omit') return '';
+  if (mode === 'custom') return item.customIntro?.trim() ?? '';
+  return generatedIntroForItem(item);
+}
 
 const performanceTypeLabel: Record<PerformanceItem['type'], string> = {
   song: '축가',
@@ -487,9 +580,18 @@ function standardNarration(item: CeremonyItem, draft: CeremonyDraft): string {
 
 function performanceNarration(items: PerformanceItem[], parentIntro?: string) {
   const sorted = [...items].sort((a, b) => a.order - b.order);
-  return sorted
+  const narration = sorted
     .map((performance, index) => {
       const label = performanceTypeLabel[performance.type];
+      const presenter = performancePresenter(performance);
+      const ownIntro = performance.introText?.trim();
+      const suppliedIntro = lines(parentIntro, ownIntro);
+      const introAlreadyNamesPerformance = !!suppliedIntro
+        && suppliedIntro.includes(label)
+        && (!performance.performerName.trim() || suppliedIntro.includes(performance.performerName.trim()));
+      if (introAlreadyNamesPerformance) {
+        return lines(ownIntro, index > 0 ? '계속해서 큰 박수 부탁드립니다.' : '큰 박수로 맞이해 주시길 바라겠습니다.');
+      }
       if (index > 0 && performance.samePerformerAsPrevious) {
         return lines(
           `이어서 같은 분께서 두 사람을 위해 두 번째 ${label}를 준비해 주셨습니다.`,
@@ -498,19 +600,33 @@ function performanceNarration(items: PerformanceItem[], parentIntro?: string) {
       }
       if (index > 0) {
         return lines(
-          `이어서 ${performance.performerName}께서도 두 사람을 위해 ${label}를 준비해 주셨습니다.`,
-          performance.introText,
+          `이어서 ${presenter}께서도 두 사람을 위해 ${label}를 준비해 주셨습니다.`,
+          ownIntro,
           '큰 박수로 맞이해 주시길 바라겠습니다.',
         );
       }
       return lines(
         `다음은 두 사람을 위한 ${label}가 준비되었습니다.`,
-        `오늘 ${label}는 ${performance.performerName}께서 준비해 주셨습니다.`,
-        performance.introText || parentIntro,
+        `오늘 ${label}는 ${presenter}께서 준비해 주셨습니다.`,
+        ownIntro,
         '큰 박수로 맞이해 주시길 바라겠습니다.',
       );
     })
     .join('\n\n');
+  return lines(parentIntro, narration);
+}
+
+function omittedSpeechNarration(item: CeremonyItem): string {
+  if (item.detailConfig.speechType === 'congratulatory') {
+    return lines(
+      '다음은 두 사람을 위한 축사를 듣는 순서입니다.',
+      '큰 박수로 맞이해 주시기 바랍니다.',
+    );
+  }
+  return lines(
+    '다음은 두 사람에게 전하는 귀중한 덕담을 듣는 순서입니다.',
+    '큰 박수로 맞이해 주시기 바랍니다.',
+  );
 }
 
 function attendanceTitle(value?: string, custom?: string) {
@@ -586,12 +702,24 @@ const candleChildScript: Record<string, { narration: string; cue: string[] }> = 
 };
 
 function sectionForItem(item: CeremonyItem, draft: CeremonyDraft, orderPath: number[]): ScriptSection {
-  const itemWithoutIntro = item.customIntro
-    ? { ...item, customIntro: undefined }
-    : item;
-  const defaultText = item.useDefaultNarration ? standardNarration(itemWithoutIntro, draft) : '';
+  const itemWithoutIntro = { ...item, customIntro: undefined };
+  const intro = resolvedIntroForItem(item);
+  const speechIntroMode = item.type === 'speech' ? introPresentationMode(item.customIntro) : undefined;
+  const defaultText = item.useDefaultNarration
+    ? item.type === 'performance'
+      ? performanceNarration(item.detailConfig.performances ?? [], intro)
+      : item.type === 'speech'
+        ? speechIntroMode === 'omit' || !intro
+          ? omittedSpeechNarration(item)
+          : intro.includes('박수')
+            ? ''
+            : '큰 박수로 맞이해 주시기 바랍니다.'
+      : standardNarration(itemWithoutIntro, draft)
+    : '';
   const selectedText = item.narrationOverride?.trim() || defaultText;
-  const narration = lines(item.customIntro?.trim(), selectedText);
+  const narration = item.type === 'performance' && !item.narrationOverride?.trim()
+    ? selectedText
+    : lines(intro, selectedText);
   const note = [
     ...(item.type === 'groom_entrance'
       ? groomEntranceNote(item)
@@ -640,14 +768,14 @@ export function generateScript(draft: CeremonyDraft): ScriptPackage {
       section.title = '혼인서약 및 성혼선언';
       section.narration = hasOverride
         ? lines(
-            vows.customIntro?.trim(),
+            resolvedIntroForItem(vows),
             vows.narrationOverride?.trim() || MC_LED_VOWS_NARRATION,
-            pronouncement.customIntro?.trim(),
+            resolvedIntroForItem(pronouncement),
             pronouncement.narrationOverride?.trim() || MC_LED_PRONOUNCEMENT_NARRATION,
           )
         : lines(
-            vows.customIntro?.trim(),
-            pronouncement.customIntro?.trim(),
+            resolvedIntroForItem(vows),
+            resolvedIntroForItem(pronouncement),
             MC_LED_COMBINED_NARRATION,
           );
       section.cue = [...new Set([...section.cue, ...pronouncementSection.cue])];
@@ -663,7 +791,7 @@ export function generateScript(draft: CeremonyDraft): ScriptPackage {
         const template = candleChildScript[nested.type];
         const childSection = sectionForItem(nested, draft, [index, childIndex]);
         if (template && !nested.narrationOverride) {
-          childSection.narration = lines(nested.customIntro?.trim(), template.narration);
+          childSection.narration = lines(resolvedIntroForItem(nested), template.narration);
           childSection.cue = nested.cueOverride ?? template.cue;
         }
         sections.push(childSection);

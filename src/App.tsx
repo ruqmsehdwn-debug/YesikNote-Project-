@@ -9,6 +9,7 @@ export default function App() {
     setDraft,
     saveStatus,
     lastSavedAt,
+    saveNow,
     onCompositionStart,
     onCompositionEnd,
   } = useDraft();
@@ -24,6 +25,7 @@ export default function App() {
               setDraft={setDraft}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
+              onSaveNow={saveNow}
               compositionHandlers={{ onCompositionStart, onCompositionEnd }}
             />
           }

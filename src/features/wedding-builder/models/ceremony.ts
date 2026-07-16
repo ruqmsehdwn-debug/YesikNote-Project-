@@ -134,6 +134,9 @@ export type ScriptPackage = {
 export type ValidationIssue = {
   id: string;
   itemId?: string;
+  ceremonyItemId?: string;
+  performanceId?: string;
+  section?: string;
   field?: string;
   severity: 'blocking' | 'warning';
   message: string;

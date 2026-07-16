@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   createCustomItem,
@@ -12,6 +12,7 @@ import type {
   CeremonyItem,
   CeremonyType,
   SaveStatus,
+  ValidationIssue,
 } from '../models/ceremony';
 import { completionRate, validateDraft } from '../services/draftValidator';
 import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngine';
@@ -24,6 +25,7 @@ type Props = {
   setDraft: (update: CeremonyDraft | ((previous: CeremonyDraft) => CeremonyDraft)) => void;
   saveStatus: SaveStatus;
   lastSavedAt: string | null;
+  onSaveNow?: () => void;
   compositionHandlers: {
     onCompositionStart: () => void;
     onCompositionEnd: () => void;
@@ -32,20 +34,32 @@ type Props = {
 
 const steps = ['예식 기본정보', '예식 유형', '전체 식순', '상세 설정', '최종 확인'];
 
+type BasicFocusTarget = {
+  field: string;
+  requestId: number;
+};
+
 export function OwnerBuilderPage({
   draft,
   setDraft,
   saveStatus,
   lastSavedAt,
+  onSaveNow,
   compositionHandlers,
 }: Props) {
   const [step, setStepState] = useState(Math.min(Math.max(draft.lastStep, 1), 5));
   const [selectedId, setSelectedId] = useState(draft.items[0]?.id);
+  const [basicFocusTarget, setBasicFocusTarget] = useState<BasicFocusTarget>();
+  const [performanceFocusTarget, setPerformanceFocusTarget] = useState<{ ceremonyItemId: string; section?: string; performanceId?: string; field?: string; requestId: number }>();
+  const editRequestRef = useRef(0);
   const script = useMemo(() => generateScript(draft), [draft]);
   const issues = useMemo(() => validateDraft(draft), [draft]);
   const blocking = issues.filter((issue) => issue.severity === 'blocking');
   const warnings = issues.filter((issue) => issue.severity === 'warning');
   const selectedItem = draft.items.find((item) => item.id === selectedId) ?? draft.items[0];
+  const pronouncementParticipant = draft.items
+    .find((item) => item.type === 'pronouncement')
+    ?.participants?.[0];
   const displayedSelectedItem = selectedItem
     ? { ...selectedItem, title: ceremonyItemDisplayTitle(selectedItem) }
     : undefined;
@@ -59,6 +73,10 @@ export function OwnerBuilderPage({
 
   const updateItems = (items: CeremonyItem[]) => setDraft((previous) => ({ ...previous, items: resetOrders(items) }));
   const updateItem = (next: CeremonyItem) => updateItems(draft.items.map((item) => item.id === next.id ? next : item));
+  const selectItem = (id: string) => {
+    setPerformanceFocusTarget(undefined);
+    setSelectedId(id);
+  };
 
   const duplicateItem = (id: string) => {
     const index = draft.items.findIndex((item) => item.id === id);
@@ -95,8 +113,8 @@ export function OwnerBuilderPage({
         <div className="header-status">
           <span className="role-badge" aria-label="현재 화면: 신랑·신부용">신랑·신부용</span>
           <span className={`save-dot ${saveStatus}`} />
-          <span>{saveStatus === 'saving' ? '저장 중' : saveStatus === 'failed' ? '저장 실패' : saveStatus === 'saved' ? '저장됨' : '자동 저장'}</span>
-          {lastSavedAt && <small>{new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</small>}
+          <span>{saveStatus === 'saving' ? '저장 중…' : saveStatus === 'failed' ? '저장하지 못했어요' : saveStatus === 'saved' ? '자동 저장됨' : '자동 저장'}{lastSavedAt && saveStatus === 'saved' ? ` · ${new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+          {onSaveNow && <button type="button" className="save-now-button" onClick={onSaveNow}>{saveStatus === 'failed' ? '다시 저장' : '저장'}</button>}
         </div>
       </header>
 
@@ -114,14 +132,14 @@ export function OwnerBuilderPage({
 
       <main className={`workspace ${step >= 3 && step <= 4 ? 'with-preview' : ''}`}>
         <section className="workspace-main">
-          {step === 1 && <BasicInfoStep draft={draft} setDraft={setDraft} />}
+          {step === 1 && <BasicInfoStep draft={draft} setDraft={setDraft} focusTarget={basicFocusTarget} />}
           {step === 2 && <CeremonyTypeStep draft={draft} onChange={changeCeremonyType} />}
           {step === 3 && (
             <OrderStep
               draft={draft}
               selectedId={selectedId}
               onItemsChange={updateItems}
-              onSelect={(id) => { setSelectedId(id); setStep(4); }}
+              onSelect={(id) => { selectItem(id); setStep(4); }}
               onToggle={(id) => updateItems(draft.items.map((item) => {
                 if (item.id !== id) return item;
                 const activating = !item.active;
@@ -158,11 +176,13 @@ export function OwnerBuilderPage({
           {step === 4 && (
             <div className="detail-layout">
               <div className="detail-rail">
-                <label className="select-label">편집할 식순<select value={selectedItem?.id ?? ''} onChange={(e) => setSelectedId(e.target.value)}>{draft.items.map((item) => <option value={item.id} key={item.id}>{item.order + 1}. {ceremonyItemDisplayTitle(item)}{item.active ? '' : ' (미진행)'}</option>)}</select></label>
+                <label className="select-label">편집할 식순<select value={selectedItem?.id ?? ''} onChange={(e) => selectItem(e.target.value)}>{draft.items.map((item) => <option value={item.id} key={item.id}>{item.order + 1}. {ceremonyItemDisplayTitle(item)}{item.active ? '' : ' (미진행)'}</option>)}</select></label>
               </div>
               {selectedItem && displayedSelectedItem ? (
                 <ItemDetailEditor
                   item={displayedSelectedItem}
+                  pronouncementParticipant={pronouncementParticipant}
+                  performanceFocusTarget={performanceFocusTarget?.ceremonyItemId === selectedItem.id ? performanceFocusTarget : undefined}
                   onChange={(next) => updateItem({
                     ...next,
                     title: next.title === displayedSelectedItem.title ? selectedItem.title : next.title,
@@ -171,7 +191,24 @@ export function OwnerBuilderPage({
               ) : <EmptyCustom onAdd={() => { const custom = createCustomItem(0); updateItems([custom]); setSelectedId(custom.id); }} />}
             </div>
           )}
-          {step === 5 && <ReviewStep draft={draft} script={script} blocking={blocking} warnings={warnings} onEdit={(id) => { setSelectedId(id); setStep(4); }} />}
+          {step === 5 && <ReviewStep draft={draft} script={script} blocking={blocking} warnings={warnings} onEdit={(issue) => {
+            const ceremonyItemId = issue.ceremonyItemId ?? issue.itemId;
+            if (!ceremonyItemId && issue.field) {
+              setBasicFocusTarget({ field: issue.field, requestId: ++editRequestRef.current });
+              setStep(1);
+              return;
+            }
+            if (!ceremonyItemId) return;
+            setSelectedId(ceremonyItemId);
+            setPerformanceFocusTarget({
+              ceremonyItemId,
+              section: issue.section,
+              performanceId: issue.performanceId,
+              field: issue.field,
+              requestId: ++editRequestRef.current,
+            });
+            setStep(4);
+          }} />}
 
           <div className="step-controls">
             <button type="button" className="button secondary" disabled={step === 1} onClick={() => setStep(step - 1)}>이전</button>
@@ -179,29 +216,36 @@ export function OwnerBuilderPage({
             {step === 5 && blocking.length === 0 && <Link className="button primary" to="/mc">사회자용 대본 열기</Link>}
           </div>
         </section>
-        {step >= 3 && step <= 4 && <ScriptPreview script={script} />}
+        {step >= 3 && step <= 4 && <ScriptPreview script={script} items={draft.items} selectedCeremonyItemId={selectedId} />}
       </main>
     </div>
   );
 }
 
-function BasicInfoStep({ draft, setDraft }: Pick<Props, 'draft' | 'setDraft'>) {
+function BasicInfoStep({ draft, setDraft, focusTarget }: Pick<Props, 'draft' | 'setDraft'> & { focusTarget?: BasicFocusTarget }) {
+  const sectionRef = useRef<HTMLDivElement>(null);
   const update = (field: keyof CeremonyDraft['basicInfo'], value: string) => setDraft((previous) => ({ ...previous, basicInfo: { ...previous.basicInfo, [field]: value } }));
+  useEffect(() => {
+    if (!focusTarget) return;
+    const field = sectionRef.current?.querySelector<HTMLElement>(`[data-basic-field="${focusTarget.field}"]`);
+    field?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    field?.focus({ preventScroll: true });
+  }, [focusTarget]);
   return (
-    <div className="page-section">
+    <div className="page-section" ref={sectionRef}>
       <div className="page-heading"><span className="section-kicker">STEP 1</span><h1>두 분의 예식 정보를 알려주세요</h1><p>입력한 정보는 사회자 대본에 정확히 반영됩니다.</p></div>
       <div className="panel form-panel">
         <div className="form-grid two">
-          <label>신랑 이름 <em>필수</em><input className="field-input" value={draft.basicInfo.groomName} onChange={(e) => update('groomName', e.target.value)} placeholder="홍길동" /></label>
-          <label>신부 이름 <em>필수</em><input className="field-input" value={draft.basicInfo.brideName} onChange={(e) => update('brideName', e.target.value)} placeholder="김예식" /></label>
-          <label>예식일 <em>필수</em><input className="field-input" type="date" value={draft.basicInfo.weddingDate} onChange={(e) => update('weddingDate', e.target.value)} /></label>
+          <label>신랑 이름 <em>필수</em><input className="field-input" data-basic-field="groomName" value={draft.basicInfo.groomName} onChange={(e) => update('groomName', e.target.value)} placeholder="홍길동" /></label>
+          <label>신부 이름 <em>필수</em><input className="field-input" data-basic-field="brideName" value={draft.basicInfo.brideName} onChange={(e) => update('brideName', e.target.value)} placeholder="김예식" /></label>
+          <label>예식일 <em>필수</em><input className="field-input" data-basic-field="weddingDate" type="date" value={draft.basicInfo.weddingDate} onChange={(e) => update('weddingDate', e.target.value)} /></label>
           <label>예식장명<input className="field-input" value={draft.basicInfo.venueName} onChange={(e) => update('venueName', e.target.value)} placeholder="예식노트 웨딩홀" /></label>
           <label>홀명<input className="field-input" value={draft.basicInfo.hallName} onChange={(e) => update('hallName', e.target.value)} placeholder="그랜드홀" /></label>
         </div>
         <div className="venue-box">
           <div><span className="eyebrow">예식장 제공 정보 · 임시 입력</span><p>정식 서비스에서는 예식장이 관리하는 공식 정보입니다.</p></div>
           <div className="form-grid two">
-            <label>피로연 장소 <em>필수</em><input className="field-input" value={draft.basicInfo.banquetLocation} onChange={(e) => update('banquetLocation', e.target.value)} placeholder="지하 1층 연회장" /></label>
+            <label>피로연 장소 <em>필수</em><input className="field-input" data-basic-field="banquetLocation" value={draft.basicInfo.banquetLocation} onChange={(e) => update('banquetLocation', e.target.value)} placeholder="지하 1층 연회장" /></label>
             <label>사진 촬영 안내<input className="field-input" value={draft.basicInfo.photoGuide ?? ''} onChange={(e) => update('photoGuide', e.target.value)} placeholder="가족·친지 촬영 순서 안내" /></label>
           </div>
         </div>
@@ -238,7 +282,7 @@ function OrderStep({ draft, selectedId, onItemsChange, onSelect, onToggle, onDup
   return (
     <div className="page-section">
       <div className="heading-row"><div className="page-heading"><span className="section-kicker">STEP 3</span><h1>전체 식순을 완성하세요</h1><p>끌어서 옮기거나 화살표 버튼으로 순서를 조정하세요.</p></div><div className="heading-actions"><button type="button" className="button secondary" onClick={onReset} disabled={draft.ceremonyType === 'religious' || draft.ceremonyType === 'custom'}>기본 순서로 되돌리기</button><button type="button" className="button primary" onClick={onAdd}>+ 자유 식순 추가</button></div></div>
-      {draft.items.length ? <SortableItemList items={displayedItems} selectedId={selectedId} onChange={(items) => onItemsChange(items.map((item) => ({ ...item, title: storedTitles.get(item.id) ?? item.title })))} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} /> : <EmptyCustom onAdd={onAdd} />}
+      {draft.items.length ? <SortableItemList items={displayedItems} selectedId={selectedId} onChange={(items) => onItemsChange(items.map((item) => ({ ...item, title: storedTitles.get(item.id) ?? item.title })))} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} onSpeechTypeChange={(id, speechType) => onItemsChange(draft.items.map((item) => item.id === id ? { ...item, detailConfig: { ...item.detailConfig, speechType } } : item))} /> : <EmptyCustom onAdd={onAdd} />}
     </div>
   );
 }
@@ -253,15 +297,15 @@ function reviewGuidance(rate: number, remainingCount: number) {
   return '준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.';
 }
 
-function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (id: string) => void }) {
+function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (issue: ValidationIssue) => void }) {
   const rate = completionRate(draft);
   const activeOutputCount = script.ceremonySections.filter((section) => !section.parentId).length;
   return (
     <div className="page-section">
       <div className="page-heading"><span className="section-kicker">STEP 5</span><h1>최종 대본을 확인하세요</h1><p>{reviewGuidance(rate, blocking.length)}</p></div>
       <div className="review-summary"><div><span>활성 식순</span><strong>{activeOutputCount}</strong></div><div><span>대본 섹션</span><strong>{script.ceremonySections.length}</strong></div><div><span>예상 시간</span><strong>{Math.ceil(script.totalEstimatedTimeSeconds / 60)}분</strong></div><div><span>완료 상태</span><strong className={blocking.length ? 'text-danger' : 'text-success'}>{blocking.length ? `미결정 ${blocking.length}` : '확인 완료'}</strong></div></div>
-      {!!blocking.length && <IssueList title="완료 전 확인이 필요해요" issues={blocking} onEdit={onEdit} />}
-      {!!warnings.length && <IssueList title="순서를 한번 확인해 주세요" issues={warnings} onEdit={onEdit} warning />}
+      {!!blocking.length && <IssueList title="완료 전 확인이 필요해요" issues={blocking} items={draft.items} onEdit={onEdit} />}
+      {!!warnings.length && <IssueList title="순서를 한번 확인해 주세요" issues={warnings} items={draft.items} onEdit={onEdit} warning />}
       {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다.</div>}
       {draft.basicInfo.globalRequestNote && <div className="global-note"><span>전체 요청사항</span><p>{draft.basicInfo.globalRequestNote}</p></div>}
       <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>}{!!section.note.length && <div className="inline-note"><strong>주의사항 / 실행 메모</strong>{section.note.join(' · ')}</div>}</div></article>)}</div>
@@ -269,4 +313,4 @@ function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: Cere
   );
 }
 
-function IssueList({ title, issues, onEdit, warning = false }: { title: string; issues: ReturnType<typeof validateDraft>; onEdit: (id: string) => void; warning?: boolean }) { return <section className={`issue-list ${warning ? 'warning' : ''}`}><h2>{title}</h2>{issues.map((issue) => <div key={issue.id}><span>{warning ? '!' : '·'}</span><p>{issue.message}</p>{issue.itemId && <button type="button" onClick={() => onEdit(issue.itemId!)}>수정하기</button>}</div>)}</section>; }
+function IssueList({ title, issues, items, onEdit, warning = false }: { title: string; issues: ReturnType<typeof validateDraft>; items: CeremonyItem[]; onEdit: (issue: ValidationIssue) => void; warning?: boolean }) { return <section className={`issue-list ${warning ? 'warning' : ''}`}><h2>{title}</h2>{issues.map((issue) => { const item = items.find((candidate) => candidate.id === (issue.ceremonyItemId ?? issue.itemId)); const canEdit = !!(issue.field || issue.itemId || issue.ceremonyItemId); return <div key={issue.id}><span>{warning ? '!' : '·'}</span><p>{item && <strong className="issue-item-title">{ceremonyItemDisplayTitle(item)}</strong>}{issue.message}</p>{canEdit && <button type="button" onClick={() => onEdit(issue)}>{warning ? '확인하기' : '입력하기'}</button>}</div>; })}</section>; }

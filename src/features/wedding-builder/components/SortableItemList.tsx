@@ -26,6 +26,7 @@ type Props = {
   onToggle?: (id: string) => void;
   onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onSpeechTypeChange?: (id: string, speechType: 'words' | 'congratulatory') => void;
 };
 
 function SortableRow({
@@ -38,6 +39,7 @@ function SortableRow({
   onToggle,
   onDuplicate,
   onDelete,
+  onSpeechTypeChange,
   onMove,
 }: {
   item: CeremonyItem;
@@ -49,6 +51,7 @@ function SortableRow({
   onToggle?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onSpeechTypeChange?: (speechType: 'words' | 'congratulatory') => void;
   onMove: (direction: -1 | 1) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -76,6 +79,26 @@ function SortableRow({
           <small>{item.active ? '진행' : '미진행 · 입력값 보존'}</small>
         </span>
       </button>
+      {!compact && item.type === 'speech' && onSpeechTypeChange && (
+        <div className="order-speech-type" role="group" aria-label={`${index + 1}번 말하기 종류`}>
+          <button
+            type="button"
+            className={(item.detailConfig.speechType ?? 'words') === 'words' ? 'active' : ''}
+            aria-pressed={(item.detailConfig.speechType ?? 'words') === 'words'}
+            onClick={() => onSpeechTypeChange('words')}
+          >
+            덕담
+          </button>
+          <button
+            type="button"
+            className={item.detailConfig.speechType === 'congratulatory' ? 'active' : ''}
+            aria-pressed={item.detailConfig.speechType === 'congratulatory'}
+            onClick={() => onSpeechTypeChange('congratulatory')}
+          >
+            축사
+          </button>
+        </div>
+      )}
       <div className="item-actions">
         <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="위로 이동">↑</button>
         <button type="button" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="아래로 이동">↓</button>
@@ -96,6 +119,7 @@ export function SortableItemList({
   onToggle,
   onDuplicate,
   onDelete,
+  onSpeechTypeChange,
 }: Props) {
   const sorted = [...items].sort((a, b) => a.order - b.order);
   const sensors = useSensors(
@@ -131,6 +155,7 @@ export function SortableItemList({
               onToggle={onToggle ? () => onToggle(item.id) : undefined}
               onDuplicate={onDuplicate ? () => onDuplicate(item.id) : undefined}
               onDelete={onDelete ? () => onDelete(item.id) : undefined}
+              onSpeechTypeChange={onSpeechTypeChange ? (speechType) => onSpeechTypeChange(item.id, speechType) : undefined}
               onMove={(direction) => reorder(index, index + direction)}
             />
           ))}

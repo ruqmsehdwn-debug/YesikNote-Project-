@@ -10,6 +10,8 @@ export function useDraft() {
   const composing = useRef(false);
   const [compositionVersion, setCompositionVersion] = useState(0);
   const initialized = useRef(false);
+  const autosaveTimeout = useRef<number | null>(null);
+  const saving = useRef(false);
 
   const setDraft = useCallback(
     (update: CeremonyDraft | ((previous: CeremonyDraft) => CeremonyDraft)) => {
@@ -21,23 +23,50 @@ export function useDraft() {
     [],
   );
 
+  const saveNow = useCallback(() => {
+    if (saving.current) return;
+    if (autosaveTimeout.current !== null) {
+      window.clearTimeout(autosaveTimeout.current);
+      autosaveTimeout.current = null;
+    }
+    saving.current = true;
+    setSaveStatus('saving');
+    try {
+      const savedAt = saveDraft(draft);
+      setLastSavedAt(savedAt);
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('failed');
+    } finally {
+      saving.current = false;
+    }
+  }, [draft]);
+
   useEffect(() => {
     if (!initialized.current) {
       initialized.current = true;
       return;
     }
-    if (composing.current) return;
     setSaveStatus('saving');
-    const timeout = window.setTimeout(() => {
+    autosaveTimeout.current = window.setTimeout(() => {
+      saving.current = true;
       try {
         const savedAt = saveDraft(draft);
         setLastSavedAt(savedAt);
         setSaveStatus('saved');
       } catch {
         setSaveStatus('failed');
+      } finally {
+        saving.current = false;
+        autosaveTimeout.current = null;
       }
-    }, 1000);
-    return () => window.clearTimeout(timeout);
+    }, composing.current ? 2000 : 1000);
+    return () => {
+      if (autosaveTimeout.current !== null) {
+        window.clearTimeout(autosaveTimeout.current);
+        autosaveTimeout.current = null;
+      }
+    };
   }, [draft, compositionVersion]);
 
   const onCompositionStart = () => {
@@ -54,6 +83,7 @@ export function useDraft() {
     setDraft,
     saveStatus,
     lastSavedAt,
+    saveNow,
     onCompositionStart,
     onCompositionEnd,
   };

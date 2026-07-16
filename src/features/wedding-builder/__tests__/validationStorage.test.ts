@@ -1,5 +1,5 @@
-import { createElement } from 'react';
-import { fireEvent, render, within } from '@testing-library/react';
+import { act, createElement } from 'react';
+import { cleanup, fireEvent, render, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ItemDetailEditor } from '../components/ItemDetailEditor';
@@ -9,6 +9,7 @@ import {
   createDraft,
 } from '../data/ceremonyTemplates';
 import { completionRate, validateDraft } from '../services/draftValidator';
+import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngine';
 import { OwnerBuilderPage } from '../pages/OwnerBuilderPage';
 import {
   DRAFT_BACKUP_STORAGE_KEY,
@@ -29,6 +30,312 @@ function completeBasic() {
 }
 
 describe('validation and storage', () => {
+  it('공연자 오류는 안정 ID와 field를 보유하고 정확한 공연 카드 입력칸을 강조·focus한다', () => {
+    vi.useFakeTimers();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+
+    try {
+      const draft = completeBasic();
+      const performance = draft.items.find((item) => item.type === 'performance')!;
+      performance.detailConfig.performances = [{
+        id: 'performance-focus-target',
+        type: 'song',
+        performerName: '',
+        title: '축가 제목',
+        samePerformerAsPrevious: false,
+        order: 0,
+      }];
+      const issue = validateDraft(draft).find((candidate) => candidate.id.includes('performance-focus-target-performer'))!;
+      expect(issue).toEqual(expect.objectContaining({
+        itemId: performance.id,
+        ceremonyItemId: performance.id,
+        performanceId: 'performance-focus-target',
+        section: 'performances',
+        field: 'performerName',
+      }));
+
+      const onChange = vi.fn();
+      const view = render(createElement(ItemDetailEditor, {
+        item: performance,
+        onChange,
+        performanceFocusTarget: {
+          section: issue.section,
+          performanceId: issue.performanceId,
+          field: issue.field,
+          requestId: 1,
+        },
+      }));
+      const performerInput = view.getByLabelText('축가를 불러 주실 분');
+      const card = view.container.querySelector('[data-performance-id="performance-focus-target"]')!;
+
+      expect(document.activeElement).toBe(performerInput);
+      expect(card).toHaveClass('performance-target');
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(onChange).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(card).not.toHaveClass('performance-target');
+    } finally {
+      cleanup();
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+      vi.useRealTimers();
+    }
+  });
+
+  it('공연이 비어 있으면 공연 parent 안정 ID와 추가 버튼 field를 제공한다', () => {
+    const draft = completeBasic();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.detailConfig.performances = [];
+    expect(validateDraft(draft)).toContainEqual(expect.objectContaining({
+      id: `${performance.id}-performance-empty`,
+      itemId: performance.id,
+      ceremonyItemId: performance.id,
+      section: 'performances',
+      field: 'performances',
+    }));
+  });
+
+  it('공연이 비어 있으면 공연 설정 영역으로 이동하고 공연 추가 버튼에 focus한다', () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+
+    try {
+      const draft = completeBasic();
+      const performance = draft.items.find((item) => item.type === 'performance')!;
+      performance.detailConfig.performances = [];
+      const issue = validateDraft(draft).find((candidate) => candidate.id === `${performance.id}-performance-empty`)!;
+      const view = render(createElement(ItemDetailEditor, {
+        item: performance,
+        onChange: vi.fn(),
+        performanceFocusTarget: {
+          section: issue.section,
+          field: issue.field,
+          requestId: 3,
+        },
+      }));
+
+      expect(document.activeElement).toBe(view.getByRole('button', { name: '+ 공연 추가' }));
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      view.unmount();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
+  it('곡명 오류는 정확한 공연 카드의 곡명 입력칸을 강조하고 focus한다', () => {
+    vi.useFakeTimers();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+
+    try {
+      const draft = completeBasic();
+      const performance = draft.items.find((item) => item.type === 'performance')!;
+      performance.detailConfig.performances = [{
+        id: 'performance-title-target',
+        type: 'dance',
+        performerName: '테스트 무용팀',
+        title: '',
+        samePerformerAsPrevious: false,
+        order: 0,
+      }];
+      const issue = validateDraft(draft).find((candidate) => candidate.id.endsWith('performance-title-target-title'))!;
+
+      expect(issue).toEqual(expect.objectContaining({
+        ceremonyItemId: performance.id,
+        performanceId: 'performance-title-target',
+        section: 'performances',
+        field: 'title',
+      }));
+
+      const view = render(createElement(ItemDetailEditor, {
+        item: performance,
+        onChange: vi.fn(),
+        performanceFocusTarget: {
+          section: issue.section,
+          performanceId: issue.performanceId,
+          field: issue.field,
+          requestId: 2,
+        },
+      }));
+      const titleInput = view.getByLabelText('곡명/공연명');
+      const card = view.container.querySelector('[data-performance-id="performance-title-target"]')!;
+
+      expect(document.activeElement).toBe(titleInput);
+      expect(card).toHaveClass('performance-target');
+      act(() => vi.advanceTimersByTime(2000));
+      expect(card).not.toHaveClass('performance-target');
+    } finally {
+      cleanup();
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+      vi.useRealTimers();
+    }
+  });
+
+  it('최종 확인의 공연 오류는 순서나 제목이 아니라 안정 ID로 공연 식순과 카드에 이동한다', () => {
+    const originalWindowScrollTo = window.scrollTo;
+    const originalElementScrollTo = HTMLElement.prototype.scrollTo;
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(window, 'scrollTo', { configurable: true, value: vi.fn() });
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+
+    try {
+      const draft = completeBasic();
+      draft.lastStep = 5;
+      const performance = draft.items.find((item) => item.type === 'performance')!;
+      const speech = draft.items.find((item) => item.type === 'speech')!;
+      performance.order = 0;
+      speech.order = draft.items.length + 3;
+      performance.detailConfig.performances = [
+        { id: 'performance-valid-first', type: 'song', performerName: '첫 공연자', title: '첫 축가', samePerformerAsPrevious: false, order: 0 },
+        { id: 'performance-invalid-second', type: 'instrumental', performerName: '두 번째 연주자', title: '', samePerformerAsPrevious: false, order: 1 },
+      ];
+      draft.items = [
+        performance,
+        ...draft.items.filter((item) => item.id !== performance.id && item.id !== speech.id),
+        speech,
+      ].map((item, order) => ({ ...item, order }));
+
+      const view = render(createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+        draft,
+        setDraft: vi.fn(),
+        saveStatus: 'saved',
+        lastSavedAt: null,
+        compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+      })));
+      const issueMessage = view.getByText('곡명 또는 공연명을 입력해 주세요.');
+      const issueRow = issueMessage.closest('div')!;
+
+      expect(within(issueRow).getByText('축가/축주')).toBeInTheDocument();
+      expect(within(issueRow).queryByText(/덕담|축사/)).not.toBeInTheDocument();
+      fireEvent.click(within(issueRow).getByRole('button', { name: '입력하기' }));
+
+      expect(view.getByRole('combobox', { name: '편집할 식순' })).toHaveValue(performance.id);
+      const targetCard = view.container.querySelector('[data-performance-id="performance-invalid-second"]')!;
+      const titleInput = targetCard.querySelector('[data-performance-field="title"]');
+      expect(targetCard).toHaveClass('performance-target');
+      expect(document.activeElement).toBe(titleInput);
+      expect(view.container.querySelector('[data-ceremony-item-id="' + performance.id + '"]')).toBeInTheDocument();
+    } finally {
+      cleanup();
+      Object.defineProperty(window, 'scrollTo', { configurable: true, value: originalWindowScrollTo });
+      if (originalElementScrollTo) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: originalElementScrollTo });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+      }
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
+  it.each([
+    ['song', '축가'],
+    ['dance', '축무'],
+    ['instrumental', '축주'],
+  ] as const)('%s 오류는 speech가 아닌 공연 parent 안정 ID를 가리킨다', (type, displayTitle) => {
+    const draft = completeBasic();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    performance.detailConfig.performances = [{
+      id: `performance-${type}-error`,
+      type,
+      performerName: '',
+      title: `${displayTitle} 제목`,
+      samePerformerAsPrevious: false,
+      order: 0,
+    }];
+
+    const issue = validateDraft(draft).find((candidate) => candidate.performanceId === `performance-${type}-error`)!;
+    expect(ceremonyItemDisplayTitle(performance)).toBe(displayTitle);
+    expect(issue).toEqual(expect.objectContaining({
+      itemId: performance.id,
+      ceremonyItemId: performance.id,
+      performanceId: `performance-${type}-error`,
+      section: 'performances',
+      field: 'performerName',
+    }));
+    expect(issue.ceremonyItemId).not.toBe(speech.id);
+  });
+
+  it('미진행 공연은 검증과 Script 출력에서 제외하고 입력값은 그대로 보존한다', () => {
+    const draft = completeBasic();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.active = false;
+    performance.narrationOverride = '보존할 직접 공연 대본';
+    performance.detailConfig.performances = [{
+      id: 'inactive-performance-data',
+      type: 'song',
+      performerName: '',
+      title: '',
+      samePerformerAsPrevious: false,
+      order: 0,
+    }];
+
+    expect(validateDraft(draft).some((issue) => issue.itemId === performance.id)).toBe(false);
+    expect(generateScript(draft).ceremonySections.some((section) => section.id === performance.id)).toBe(false);
+    expect(performance.detailConfig.performances?.[0]?.id).toBe('inactive-performance-data');
+    expect(performance.narrationOverride).toBe('보존할 직접 공연 대본');
+  });
+
+  it('저장 버튼은 자동 저장 상태를 표시하고 한글 조합 대기 중에도 즉시 저장할 수 있다', () => {
+    const draft = completeBasic();
+    const onSaveNow = vi.fn();
+    const view = render(createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+      draft,
+      setDraft: vi.fn(),
+      saveStatus: 'saved',
+      lastSavedAt: '2026-07-16T03:04:00.000Z',
+      onSaveNow,
+      compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+    })));
+
+    expect(view.getByText(/자동 저장됨 ·/)).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: '저장' }));
+    expect(onSaveNow).toHaveBeenCalledTimes(1);
+
+    view.rerender(createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+      draft,
+      setDraft: vi.fn(),
+      saveStatus: 'saving',
+      lastSavedAt: null,
+      onSaveNow,
+      compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+    })));
+    expect(view.getByText('저장 중…')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '저장' })).toBeEnabled();
+
+    view.rerender(createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+      draft,
+      setDraft: vi.fn(),
+      saveStatus: 'failed',
+      lastSavedAt: null,
+      onSaveNow,
+      compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+    })));
+    expect(view.getByText('저장하지 못했어요')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '다시 저장' })).toBeEnabled();
+    view.unmount();
+  });
+
   it('기존 Owner Builder의 5단계 화면을 유지한다', () => {
     const draft = completeBasic();
     const view = render(
@@ -236,14 +543,114 @@ describe('validation and storage', () => {
     const speech = draft.items.find((item) => item.type === 'speech')!;
     const onChange = vi.fn();
     const view = render(createElement(ItemDetailEditor, { item: speech, onChange }));
-    const select = view.getByRole('combobox', { name: '말하기 종류' });
+    const selector = view.getByRole('group', { name: '덕담·축사 구분' });
 
-    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['덕담', '축사']);
-    expect(within(select).queryByRole('option', { name: '축가' })).not.toBeInTheDocument();
-    fireEvent.change(select, { target: { value: 'congratulatory' } });
+    expect(within(selector).getByRole('button', { name: '덕담' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(selector).getByRole('button', { name: '축사' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(selector).queryByRole('button', { name: '축가' })).not.toBeInTheDocument();
+    expect(view.getByRole('textbox', { name: '덕담자 이름 또는 호칭' })).toBeInTheDocument();
+    expect(view.getByRole('textbox', { name: /신랑·신부와의 관계/ })).toHaveAttribute(
+      'placeholder',
+      '예: 신랑 아버지, 신부 어머니, 신랑 측 회사 대표',
+    );
+    expect(view.getByText('이름 또는 관계를 입력하면 선택한 내용에 맞춰 사회자가 읽을 소개 문장을 자동으로 만들어요.')).toHaveClass(
+      'speech-participant-help',
+      'full',
+    );
+    expect(view.queryByText('자동 소개 문장과 사회자 참고정보에만 사용됩니다.')).not.toBeInTheDocument();
+    fireEvent.click(within(selector).getByRole('button', { name: '축사' }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       id: speech.id,
       detailConfig: expect.objectContaining({ speechType: 'congratulatory' }),
+    }));
+    view.unmount();
+
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    const congratulatoryView = render(createElement(ItemDetailEditor, { item: speech, onChange: vi.fn() }));
+    expect(congratulatoryView.getByRole('textbox', { name: '축사자 이름 또는 호칭' })).toHaveAttribute('placeholder', '예: 이동주, 김예식');
+    expect(congratulatoryView.getByRole('textbox', { name: /신랑·신부와의 관계/ })).toHaveAttribute(
+      'placeholder',
+      '예: 신부의 고등학교 친구, 신랑의 직장 동료',
+    );
+    congratulatoryView.unmount();
+  });
+
+  it('소개 문장 설정은 기존 customIntro로 자동·직접·생략 모드를 표현한다', () => {
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: speech, onChange }));
+    const editor = within(view.container);
+
+    expect(editor.getByRole('group', { name: '소개 문장 설정' })).toBeInTheDocument();
+    expect(editor.getByRole('radio', { name: '자동 생성' })).toBeChecked();
+    expect(editor.getByText('이름 또는 호칭을 입력하면 완성된 소개 문장을 자동으로 만들어요.')).toBeInTheDocument();
+    expect(editor.getByRole('checkbox', { name: '예식노트 기본 대본 사용' })).toBeInTheDocument();
+    expect(editor.getByRole('textbox', { name: /기본 대본 전체 바꾸기/ })).toBeInTheDocument();
+
+    fireEvent.click(editor.getByRole('radio', { name: '직접 입력' }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ customIntro: ' ' }));
+
+    view.rerender(createElement(ItemDetailEditor, { item: { ...speech, customIntro: ' ' }, onChange }));
+    expect(editor.getByRole('radio', { name: '직접 입력' })).toBeChecked();
+    expect(editor.getByRole('textbox', { name: /소개 문장 직접 입력/ })).toBeInTheDocument();
+    expect(editor.getByText('사회자가 실제로 읽을 완성된 문장으로 작성해 주세요.')).toBeInTheDocument();
+
+    fireEvent.click(editor.getByRole('radio', { name: '소개 생략' }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ customIntro: '없음' }));
+    view.unmount();
+  });
+
+  it('기존 없음 소개 값은 생략 UI로 해석하되 Draft 원본을 다시 쓰지 않는다', () => {
+    localStorage.clear();
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '없음';
+    saveDraft(draft);
+
+    const restored = loadDraft()!;
+    const restoredSpeech = restored.items.find((item) => item.id === speech.id)!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: restoredSpeech, onChange }));
+    const editor = within(view.container);
+
+    expect(editor.getByRole('radio', { name: '소개 생략' })).toBeChecked();
+    expect(editor.queryByRole('textbox', { name: /소개 문장 직접 입력/ })).not.toBeInTheDocument();
+    expect(restoredSpeech.customIntro).toBe('없음');
+    expect(JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)!).schemaVersion).toBe(DRAFT_SCHEMA_VERSION);
+    expect(onChange).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('성혼선언자 정보 불러오기는 실제 정보가 있을 때만 표시하고 기존 participant로 복사한다', () => {
+    const draft = completeBasic();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, { item: speech, onChange }));
+
+    expect(view.queryByRole('checkbox', { name: /성혼선언자 정보 불러오기/ })).not.toBeInTheDocument();
+
+    const pronouncementParticipant = {
+      id: 'pronouncement-source',
+      role: 'pronouncement_speaker',
+      name: '김대표님',
+      relation: '신랑의 직장 상사',
+    };
+    view.rerender(createElement(ItemDetailEditor, {
+      item: speech,
+      onChange,
+      pronouncementParticipant,
+    }));
+
+    const importCheckbox = view.getByRole('checkbox', { name: /성혼선언자 정보 불러오기/ });
+    expect(view.getByText('성혼선언자에 입력한 이름과 관계를 불러옵니다.')).toBeInTheDocument();
+    fireEvent.click(importCheckbox);
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      detailConfig: expect.objectContaining({ sameAsPronouncement: true }),
+      participants: [expect.objectContaining({
+        name: '김대표님',
+        relation: '신랑의 직장 상사',
+      })],
     }));
     view.unmount();
   });
@@ -259,6 +666,9 @@ describe('validation and storage', () => {
     const view = render(createElement(ItemDetailEditor, { item: performance, onChange }));
     const select = view.getByRole('combobox', { name: '공연 종류' });
 
+    expect(view.getByText('공연 1 · 축가')).toBeInTheDocument();
+    expect(view.getByRole('textbox', { name: '축가를 불러 주실 분' })).toHaveAttribute('placeholder', '예: 이동주, 김예식');
+    expect(view.getByRole('textbox', { name: '신랑·신부와의 관계' })).toHaveAttribute('placeholder', '예: 신랑의 고등학교 친구');
     expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['축가', '축무', '축주']);
     expect(within(select).queryByRole('option', { name: '덕담' })).not.toBeInTheDocument();
     expect(within(select).queryByRole('option', { name: '축사' })).not.toBeInTheDocument();
@@ -270,6 +680,32 @@ describe('validation and storage', () => {
       }),
     }));
     view.unmount();
+  });
+
+  it.each([
+    ['song', '축가를 불러 주실 분을 알려주세요.'],
+    ['dance', '축무를 선보일 분을 알려주세요.'],
+    ['instrumental', '축주를 연주해 주실 분을 알려주세요.'],
+  ] as const)('%s 공연은 이름과 관계가 모두 없을 때만 참여자 오류를 표시한다', (type, message) => {
+    const draft = completeBasic();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.detailConfig.performances = [{
+      id: `participant-${type}`,
+      type,
+      performerName: '',
+      performerRelation: '신랑의 고등학교 친구',
+      title: '공연명',
+      samePerformerAsPrevious: false,
+      order: 0,
+    }];
+
+    expect(validateDraft(draft).some((issue) => issue.id.endsWith('-performer'))).toBe(false);
+    performance.detailConfig.performances[0].performerRelation = '';
+    expect(validateDraft(draft)).toContainEqual(expect.objectContaining({
+      id: `${performance.id}-participant-${type}-performer`,
+      field: 'performerName',
+      message,
+    }));
   });
 
   it('성혼선언자 입력은 중립 label과 기존 participant 필드를 재사용한다', () => {
@@ -358,6 +794,33 @@ describe('validation and storage', () => {
     view.unmount();
   });
 
+  it.each([
+    ['weddingDate', '예식일을 입력해 주세요.'],
+    ['groomName', '신랑 이름을 입력해 주세요.'],
+    ['brideName', '신부 이름을 입력해 주세요.'],
+    ['banquetLocation', '피로연 장소를 입력해 주세요.'],
+  ] as const)('기본정보 %s 오류의 입력하기는 1단계 정확한 입력칸으로 이동한다', (field, message) => {
+    const draft = completeBasic();
+    draft.basicInfo[field] = '';
+    draft.lastStep = 5;
+    const view = render(
+      createElement(MemoryRouter, null, createElement(OwnerBuilderPage, {
+        draft,
+        setDraft: vi.fn(),
+        saveStatus: 'saved',
+        lastSavedAt: null,
+        compositionHandlers: { onCompositionStart: vi.fn(), onCompositionEnd: vi.fn() },
+      })),
+    );
+
+    const issueRow = view.getByText(message).closest('div')!;
+    fireEvent.click(within(issueRow).getByRole('button', { name: '입력하기' }));
+    const input = view.container.querySelector(`[data-basic-field="${field}"]`);
+    expect(input).toBeInTheDocument();
+    expect(document.activeElement).toBe(input);
+    view.unmount();
+  });
+
   it('작성 완료 후 완료 안내와 사회자용 대본 열기 링크만 표시한다', () => {
     const draft = completeBasic();
     const speech = draft.items.find((item) => item.type === 'speech')!;
@@ -370,6 +833,7 @@ describe('validation and storage', () => {
         id: 'performance-complete',
         type: 'song',
         performerName: '이민수',
+        title: '축가 제목',
         samePerformerAsPrevious: false,
         order: 0,
       }],

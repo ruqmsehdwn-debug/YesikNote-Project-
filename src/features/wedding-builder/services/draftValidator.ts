@@ -11,6 +11,12 @@ function activeTree(items: CeremonyItem[]) {
   );
 }
 
+function performanceParticipantMessage(type: string): string {
+  if (type === 'dance') return '축무를 선보일 분을 알려주세요.';
+  if (type === 'instrumental') return '축주를 연주해 주실 분을 알려주세요.';
+  return '축가를 불러 주실 분을 알려주세요.';
+}
+
 export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const combinedMcLedVows = draft.items.some(
@@ -152,17 +158,37 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
         issues.push({
           id: `${item.id}-performance-empty`,
           itemId: item.id,
+          ceremonyItemId: item.id,
+          section: 'performances',
+          field: 'performances',
           severity: 'blocking',
           message: '진행할 공연을 하나 이상 추가하거나 이 식순을 미진행으로 바꿔 주세요.',
         });
       }
-      performances.forEach((performance) => {
-        if (!performance.performerName.trim()) {
+      performances.forEach((performance, index) => {
+        const usesPreviousPerformer = index > 0 && performance.samePerformerAsPrevious;
+        if (!usesPreviousPerformer && !performance.performerName.trim() && !performance.performerRelation?.trim()) {
           issues.push({
             id: `${item.id}-${performance.id}-performer`,
             itemId: item.id,
+            ceremonyItemId: item.id,
+            performanceId: performance.id,
+            section: 'performances',
+            field: 'performerName',
             severity: 'blocking',
-            message: '공연자의 이름 또는 호칭을 입력해 주세요.',
+            message: performanceParticipantMessage(performance.type),
+          });
+        }
+        if (!performance.title?.trim()) {
+          issues.push({
+            id: `${item.id}-${performance.id}-title`,
+            itemId: item.id,
+            ceremonyItemId: item.id,
+            performanceId: performance.id,
+            section: 'performances',
+            field: 'title',
+            severity: 'blocking',
+            message: '곡명 또는 공연명을 입력해 주세요.',
           });
         }
       });

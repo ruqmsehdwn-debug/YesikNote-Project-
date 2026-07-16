@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createCandleChildren,
@@ -8,6 +8,7 @@ import {
   restoreCanonicalOrder,
 } from '../data/ceremonyTemplates';
 import { SortableItemList } from '../components/SortableItemList';
+import { ceremonyItemDisplayTitle } from '../services/scriptEngine';
 
 const noOfficiantTitles = [
   '개식사',
@@ -252,5 +253,29 @@ describe('ceremony templates', () => {
     expect(moved.map((item: { order: number }) => item.order)).toEqual(
       Array.from({ length: 13 }, (_, index) => index),
     );
+  });
+
+  it('3단계 말하기 카드에서 안정 ID 기준으로 덕담과 축사를 바로 선택한다', () => {
+    const items = createTemplate('no_officiant');
+    const speech = items.find((item) => item.type === 'speech')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'words' };
+    const displayedItems = items.map((item) => ({ ...item, title: ceremonyItemDisplayTitle(item) }));
+    const onSpeechTypeChange = vi.fn();
+    const view = render(
+      createElement(SortableItemList, {
+        items: displayedItems,
+        onChange: vi.fn(),
+        onSpeechTypeChange,
+      }),
+    );
+    const selector = view.getByRole('group', { name: `${speech.order + 1}번 말하기 종류` });
+
+    expect(within(view.container).getAllByText('덕담').length).toBeGreaterThan(1);
+    expect(view.container).not.toHaveTextContent('덕담/축사');
+    expect(selector.querySelector('[aria-pressed="true"]')).toHaveTextContent('덕담');
+
+    fireEvent.click(within(selector).getByRole('button', { name: '축사' }));
+
+    expect(onSpeechTypeChange).toHaveBeenCalledWith(speech.id, 'congratulatory');
   });
 });

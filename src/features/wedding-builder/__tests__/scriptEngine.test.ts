@@ -1,7 +1,7 @@
-import { createElement } from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { act, createElement } from 'react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createDraft, restoreCanonicalOrder } from '../data/ceremonyTemplates';
 import type { CeremonyDraft, CeremonyItem } from '../models/ceremony';
 import { OwnerBuilderPage } from '../pages/OwnerBuilderPage';
@@ -96,6 +96,125 @@ function configureMcLedItems(draft: CeremonyDraft, vowsMc: boolean, pronouncemen
 }
 
 describe('scriptEngine', () => {
+  it('선택 식순 또는 선택 식순의 대본이 바뀌면 같은 미리보기 카드를 스크롤하고 잠깐 강조한다', () => {
+    vi.useFakeTimers();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const scrollTo = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn(() => ({ matches: false })),
+    });
+
+    try {
+      const draft = filledDraft();
+      const groom = draft.items.find((item) => item.type === 'groom_entrance')!;
+      const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+      const script = generateScript(draft);
+      const view = render(createElement(ScriptPreview, {
+        script,
+        items: draft.items,
+        selectedCeremonyItemId: groom.id,
+      }));
+
+      const groomCard = view.container.querySelector(`[data-ceremony-item-id="${groom.id}"]`)!;
+      expect(groomCard).toHaveClass('preview-target');
+      expect(groomCard).toHaveClass('preview-selected');
+      expect(view.container.querySelector(`[data-ceremony-item-id="${bride.id}"]`)).not.toHaveClass('preview-selected');
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+
+      view.rerender(createElement(ScriptPreview, {
+        script: { ...script },
+        items: draft.items,
+        selectedCeremonyItemId: groom.id,
+      }));
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+
+      view.rerender(createElement(ScriptPreview, {
+        script: {
+          ...script,
+          ceremonySections: script.ceremonySections.map((candidate) => candidate.id === groom.id
+            ? { ...candidate, narration: `${candidate.narration}\n입력 중인 내용` }
+            : candidate),
+        },
+        items: draft.items,
+        selectedCeremonyItemId: groom.id,
+      }));
+      expect(scrollTo).toHaveBeenCalledTimes(2);
+
+      view.rerender(createElement(ScriptPreview, {
+        script,
+        items: draft.items,
+        selectedCeremonyItemId: bride.id,
+      }));
+      expect(scrollTo).toHaveBeenCalledTimes(3);
+      expect(view.container.querySelector(`[data-ceremony-item-id="${bride.id}"]`)).toHaveClass('preview-target');
+      expect(view.container.querySelector(`[data-ceremony-item-id="${bride.id}"]`)).toHaveClass('preview-selected');
+      expect(groomCard).not.toHaveClass('preview-selected');
+
+      act(() => vi.advanceTimersByTime(2000));
+      expect(view.container.querySelector(`[data-ceremony-item-id="${bride.id}"]`)).not.toHaveClass('preview-target');
+    } finally {
+      cleanup();
+      if (originalScrollTo) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: originalScrollTo });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+      }
+      if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia });
+      } else {
+        delete (window as Partial<Window>).matchMedia;
+      }
+      vi.useRealTimers();
+    }
+  });
+
+  it('미리보기 이동은 입력 focus를 빼앗지 않고 reduced motion에서는 즉시 스크롤한다', () => {
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const scrollTo = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn(() => ({ matches: true })),
+    });
+
+    try {
+      const draft = filledDraft();
+      const groom = draft.items.find((item) => item.type === 'groom_entrance')!;
+      const bride = draft.items.find((item) => item.type === 'bride_entrance')!;
+      const script = generateScript(draft);
+      const view = render(createElement('div', null,
+        createElement('input', { 'aria-label': '입력 중인 값' }),
+        createElement(ScriptPreview, { script, items: draft.items, selectedCeremonyItemId: groom.id }),
+      ));
+      const input = view.getByLabelText('입력 중인 값');
+      input.focus();
+
+      view.rerender(createElement('div', null,
+        createElement('input', { 'aria-label': '입력 중인 값' }),
+        createElement(ScriptPreview, { script, items: draft.items, selectedCeremonyItemId: bride.id }),
+      ));
+
+      expect(document.activeElement).toBe(view.getByLabelText('입력 중인 값'));
+      expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: 'auto' }));
+    } finally {
+      cleanup();
+      if (originalScrollTo) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: originalScrollTo });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+      }
+      if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia });
+      } else {
+        delete (window as Partial<Window>).matchMedia;
+      }
+    }
+  });
+
   it('식전 안내를 15/10/5분 세 번 만들고 피로연 장소를 말하지 않는다', () => {
     const result = generateScript(filledDraft());
     expect(result.preCeremonyChecklist.map((item) => item.title)).toEqual([
@@ -240,6 +359,35 @@ describe('scriptEngine', () => {
     expect(section(draft, 'performance')?.title).toBe(expected);
     expect(ceremonyItemDisplayTitle(performance)).not.toMatch(/덕담|축사/);
     expect({ id: performance.id, title: performance.title }).toEqual(stored);
+  });
+
+  it('공연자는 이름이나 관계를 사용하고 여러 이름을 읽기 좋은 구분자로 조합한다', () => {
+    const draft = filledDraft();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.detailConfig.performances = [
+      {
+        id: 'relation-only-performance',
+        type: 'song',
+        performerName: '',
+        performerRelation: '신랑의 고등학교 친구분들',
+        title: '첫 축가',
+        samePerformerAsPrevious: false,
+        order: 0,
+      },
+      {
+        id: 'named-performance',
+        type: 'instrumental',
+        performerName: '이동주, 김예식',
+        performerRelation: '신랑의 고등학교 친구',
+        title: '축주곡',
+        samePerformerAsPrevious: false,
+        order: 1,
+      },
+    ];
+
+    const narration = section(draft, 'performance')!.narration;
+    expect(narration).toContain('오늘 축가는 신랑의 고등학교 친구분들께서 준비해 주셨습니다.');
+    expect(narration).toContain('신랑의 고등학교 친구인 이동주·김예식 님께서도 두 사람을 위해 축주를 준비해 주셨습니다.');
   });
 
   it('여러 공연 유형은 실제 의미 순서로 표시하고 말하기 식순과 섞지 않는다', () => {
@@ -452,7 +600,7 @@ describe('scriptEngine', () => {
     mcView.unmount();
   });
 
-  it('축사 소개 멘트를 기본 본문 앞에 원문 그대로 출력한다', () => {
+  it('직접 입력한 축사 소개 문장은 인물 정보를 자동으로 다시 붙이지 않는다', () => {
     const draft = filledDraft();
     const speech = draft.items.find((item) => item.type === 'speech')!;
     speech.customIntro = '신부의 오랜 친구가 준비한 축사를 소개합니다.';
@@ -460,9 +608,98 @@ describe('scriptEngine', () => {
     const narration = section(draft, 'speech')!.narration;
 
     expect(narration.startsWith(speech.customIntro)).toBe(true);
-    expect(narration).toContain('김지우');
+    expect(narration).not.toContain('김지우');
     expect(narration.match(/신부의 오랜 친구가 준비한 축사를 소개합니다\./g)).toHaveLength(1);
   });
+
+  it('관계와 이름으로 축사 자동 소개 문장을 완성하고 관계를 단독 출력하지 않는다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    const stored = { id: speech.id, title: speech.title };
+    speech.customIntro = '';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    speech.participants = [{
+      id: 'auto-speech-person',
+      role: 'speaker',
+      name: '안승균',
+      relation: '신부의 고등학교 친구',
+    }];
+
+    const narration = section(draft, 'speech')!.narration;
+    expect(narration).toMatch(/^다음은 신부의 고등학교 친구 안승균 님의 축사가 있겠습니다\.\n큰 박수로 맞이해 주시기 바랍니다\./);
+    expect(narration).not.toMatch(/^신부의 고등학교 친구\n/);
+    expect({ id: speech.id, title: speech.title }).toEqual(stored);
+  });
+
+  it('덕담 자동 소개는 입력한 호칭을 중복 가공하지 않는다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'words' };
+    speech.participants = [{ id: 'words-person', role: 'speaker', name: '신랑 아버님' }];
+
+    expect(section(draft, 'speech')?.narration).toMatch(
+      /^다음은 신랑 아버님께서 준비하신 덕담이 있겠습니다\.\n큰 박수로 맞이해 주시기 바랍니다\./,
+    );
+    expect(section(draft, 'speech')?.narration).not.toContain('아버님 님');
+  });
+
+  it('덕담 관계의 부모 호칭을 자연스럽게 정리하고 진행자를 한 번만 소개한다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'words' };
+    speech.participants = [{ id: 'parent-speaker', role: 'speaker', name: '탁', relation: '신부님의어머님' }];
+
+    const narration = section(draft, 'speech')!.narration;
+    expect(narration).toBe(
+      '다음은 신부 어머님이신 탁 님께서 준비하신 덕담이 있겠습니다.\n큰 박수로 맞이해 주시기 바랍니다.',
+    );
+    expect(narration.match(/탁/g)).toHaveLength(1);
+    expect(narration).not.toContain('신부님의어머님');
+  });
+
+  it('자동 생성에 이름이 없어도 관계만으로 완성된 소개 문장을 만든다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'words' };
+    speech.participants = [{ id: 'missing-name', role: 'speaker', name: '', relation: '신부님의어머님' }];
+
+    const narration = section(draft, 'speech')!.narration;
+    expect(narration).toBe(
+      '다음은 신부 어머님께서 준비하신 덕담이 있겠습니다.\n큰 박수로 맞이해 주시기 바랍니다.',
+    );
+  });
+
+  it('직접 입력 소개 문장은 관계를 자동으로 다시 붙이지 않고 override 앞에 둔다', () => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.customIntro = '두 분의 오랜 친구를 큰 박수로 맞아 주세요.';
+    speech.narrationOverride = '사용자가 바꾼 전체 축사 대본';
+    speech.participants = [{ id: 'custom-intro', role: 'speaker', name: '안승균', relation: '신부의 고등학교 친구' }];
+
+    expect(section(draft, 'speech')?.narration).toBe(
+      '두 분의 오랜 친구를 큰 박수로 맞아 주세요.\n사용자가 바꾼 전체 축사 대본',
+    );
+    expect(section(draft, 'speech')?.narration).not.toContain('신부의 고등학교 친구');
+  });
+
+  it.each(['없음', '없어요', '해당 없음', '해당없음', '-'])(
+    '기존 소개 값 %s은 원본을 유지하면서 출력에서 생략한다',
+    (legacyValue) => {
+      const draft = filledDraft();
+      const speech = draft.items.find((item) => item.type === 'speech')!;
+      speech.customIntro = legacyValue;
+      speech.participants = [{ id: 'omitted-intro', role: 'speaker', name: '김지우', relation: '신부의 친구' }];
+
+      const narration = section(draft, 'speech')!.narration;
+      expect(narration).not.toContain(legacyValue);
+      expect(narration).not.toContain('신부의 친구');
+      expect(speech.customIntro).toBe(legacyValue);
+      expect(narration).not.toContain('\n\n');
+    },
+  );
 
   it('모든 식순의 소개 멘트는 override 앞에 출력하고 기본 본문을 중복하지 않는다', () => {
     const draft = filledDraft();
@@ -501,6 +738,90 @@ describe('scriptEngine', () => {
     advancePastChecklist(mcView);
     expect(mcView.container.querySelector('.mc-narration')?.textContent).toContain(speech.customIntro);
     mcView.unmount();
+  });
+
+  it('자동 생성 소개 문장이 Owner 미리보기·최종 확인·MC에 동일하게 출력된다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    const speech = moveItemFirst(draft, 'speech');
+    speech.customIntro = '';
+    speech.detailConfig = { ...speech.detailConfig, speechType: 'congratulatory' };
+    speech.participants = [{ id: 'three-view-auto', role: 'speaker', name: '안승균', relation: '신부의 고등학교 친구' }];
+    const expected = '다음은 신부의 고등학교 친구 안승균 님의 축사가 있겠습니다.';
+
+    draft.lastStep = 3;
+    const previewView = render(ownerPage(draft));
+    expect(previewView.container.querySelector('.preview-intro')).toHaveTextContent(expected);
+    expect(previewView.container.querySelector('.preview-body')).toBeInTheDocument();
+    previewView.unmount();
+
+    draft.lastStep = 5;
+    const reviewView = render(ownerPage(draft));
+    expect(reviewView.container.textContent).toContain(expected);
+    reviewView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).toContain(expected);
+    mcView.unmount();
+  });
+
+  it('소개 생략 값은 Owner 미리보기·최종 확인·MC 어디에도 표시하지 않는다', () => {
+    localStorage.clear();
+    const draft = filledDraft();
+    const speech = moveItemFirst(draft, 'speech');
+    speech.customIntro = '없음';
+    speech.narrationOverride = '소개 없이 바로 읽을 축사 본문';
+
+    draft.lastStep = 3;
+    const previewView = render(ownerPage(draft));
+    expect(previewView.container.querySelector('.preview-panel')?.textContent).not.toContain('없음');
+    expect(previewView.container.querySelector('.preview-intro')).not.toBeInTheDocument();
+    expect(previewView.container.querySelector('.preview-body')).toHaveTextContent('소개 없이 바로 읽을 축사 본문');
+    previewView.unmount();
+
+    draft.lastStep = 5;
+    const reviewView = render(ownerPage(draft));
+    expect(reviewView.container.textContent).not.toContain('없음');
+    expect(reviewView.container.textContent).toContain('소개 없이 바로 읽을 축사 본문');
+    reviewView.unmount();
+
+    const mcView = render(createElement(MemoryRouter, null, createElement(McPrompterPage, { draft })));
+    advancePastChecklist(mcView);
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).not.toContain('없음');
+    expect(mcView.container.querySelector('.mc-narration')?.textContent).toContain('소개 없이 바로 읽을 축사 본문');
+    mcView.unmount();
+  });
+
+  it.each([
+    ['words', '다음은 두 사람에게 전하는 귀중한 덕담을 듣는 순서입니다.'],
+    ['congratulatory', '다음은 두 사람을 위한 축사를 듣는 순서입니다.'],
+  ] as const)('소개 생략한 %s 기본 대본은 진행자를 추측하지 않고 중립 문장을 사용한다', (speechType, expected) => {
+    const draft = filledDraft();
+    const speech = draft.items.find((item) => item.type === 'speech')!;
+    speech.detailConfig = { ...speech.detailConfig, speechType };
+    speech.customIntro = '없음';
+    speech.narrationOverride = undefined;
+
+    const narration = section(draft, 'speech')!.narration;
+    expect(narration).toBe(`${expected}\n큰 박수로 맞이해 주시기 바랍니다.`);
+    expect(narration).not.toContain('진행자');
+  });
+
+  it('공연 직접 소개가 공연자와 종류를 이미 말하면 기본 대본에서 같은 정보를 반복하지 않는다', () => {
+    const draft = filledDraft();
+    const performance = draft.items.find((item) => item.type === 'performance')!;
+    performance.customIntro = '다음은 QA노래팀의 축가와 QA연주팀의 축주가 있겠습니다.';
+    performance.detailConfig.performances = [
+      { id: 'dedupe-song', type: 'song', performerName: 'QA노래팀', title: 'QA축가곡', samePerformerAsPrevious: false, order: 0 },
+      { id: 'dedupe-instrumental', type: 'instrumental', performerName: 'QA연주팀', title: 'QA축주곡', samePerformerAsPrevious: false, order: 1 },
+    ];
+
+    const narration = section(draft, 'performance')!.narration;
+    expect(narration.match(/QA노래팀/g)).toHaveLength(1);
+    expect(narration.match(/QA연주팀/g)).toHaveLength(1);
+    expect(narration.match(/축가/g)).toHaveLength(1);
+    expect(narration.match(/축주/g)).toHaveLength(1);
   });
 
   it('실시간 미리보기는 대본·진행 큐·주의사항을 별도 class로 구분한다', () => {
@@ -740,7 +1061,7 @@ describe('scriptEngine', () => {
     const narration = section(draft, 'performance')!.narration;
     expect(narration).toContain('축가가 준비되었습니다');
     expect(narration).toContain('두 번째 축무');
-    expect(narration).toContain('연주자 지우께서도');
+    expect(narration).toContain('연주자 지우 님께서도');
     expect(narration).toContain('축주');
   });
 
