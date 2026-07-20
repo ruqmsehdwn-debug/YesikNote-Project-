@@ -2,6 +2,8 @@
 
 상태: WORKING · 현재 배포 코드 기준
 
+> 문서 역할: 이 PRD는 현재 배포된 Owner Builder·MC MVP의 구현 기준입니다. Final Snapshot, Venue 흐름, 인쇄·PDF, Supabase·Auth·RLS 등은 현재 구현 요구사항이 아니라 미구현 또는 Backlog입니다. 향후 `MVP Owner Builder Specification`, `Pilot Plan & Finalization Requirements`, 상위 제품 PRD로 역할을 분리할 수 있으나 이번 Batch에서는 본문을 이동·삭제하거나 새 문서를 만들지 않습니다.
+
 ## 1. 서비스 개요
 
 YesikNote는 신랑·신부가 식순과 필요한 정보를 작성하면 사회자가 실제로 사용할 대본, 진행 큐, 주의사항을 같은 데이터에서 생성하는 예식 준비 도구입니다.
@@ -238,4 +240,3 @@ Client Review, VenueAdmin, Guest는 제품 개념 후보이며 현재 권한 시
 ## 24. 변경 이력
 
 Commit별 이력은 [CHANGELOG](./CHANGELOG.md), 결정 근거는 [DECISIONS](./DECISIONS.md), 검증은 [QA_LOG](./QA_LOG.md)를 따릅니다.
-

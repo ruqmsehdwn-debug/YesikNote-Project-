@@ -1,29 +1,30 @@
 # YesikNote 프로젝트 현황
 
-최종 갱신일: 2026-07-17
+최종 갱신일: 2026-07-20
 
 ## 기준선
 
 | 항목 | 현재 값 |
 |---|---|
 | Repository | `ruqmsehdwn-debug/YesikNote-Project-` |
-| Branch | `main` |
-| HEAD | `6e136bcf9ac4e347df71654f609fc729a79885f0` |
-| 최신 승인 Commit | `6e136bcf9ac4e347df71654f609fc729a79885f0` |
+| 기준 Branch | `main` |
+| 현재 작업 Branch | `work/documentation-baseline-alignment` |
+| 기준 HEAD (`main`, `origin/main`) | `b6f937c3e4876f02b2a6099bdf13a70bda45319e` |
+| 문서 복구 Commit | `b6f937c3e4876f02b2a6099bdf13a70bda45319e` · 생성·Push `CONFIRMED` |
 | 최신 배포 Commit | `6e136bcf9ac4e347df71654f609fc729a79885f0` |
 | 배포 | [GitHub Pages](https://ruqmsehdwn-debug.github.io/YesikNote-Project-/) |
 | Actions | [Deploy Vite site to GitHub Pages #6](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/actions/runs/29521311659) · success |
-| 작업 폴더 | 문서 작성 전 clean, 코드 미Commit 없음 |
+| 작업 폴더 | Documentation Baseline Alignment 로컬 문서 수정 중 · Commit·Push 전 |
 | 현재 Draft | key `yesiknote:owner-builder:draft:v1` · schema `2` |
 
 ## 현재 단계
 
 - 전체 운영 단계: 10개(Phase 0~9)
-- 현재: Phase 8 Documentation Recovery 문서 최종 검수
-- 현재 Batch: 프로젝트 문서 체계 복구
-- 이전 Batch: Post-Patch Owner UX·Validation 안정화
-- 다음 단계: Phase 9 문서 전용 Commit·Push
-- 다음 기능 Batch: 문서 복구와 Product Owner 우선순위 승인 후 결정
+- 현재: Documentation Baseline Alignment 로컬 문서 수정·검수
+- 현재 Batch: Documentation Baseline Alignment
+- 이전 Batch: Documentation Recovery · Commit `b6f937c` 생성 및 `origin/main` Push 완료
+- 다음 단계: Product Owner의 별도 Commit 승인 대기
+- 다음 기능 Batch: 문서 기준선 정렬 완료와 Product Owner 우선순위 승인 후 결정
 
 ## 구현 범위
 
@@ -42,7 +43,15 @@
 - MC 읽기 전용 화면
 - GitHub Pages 자동 배포
 
-### 현재 범위 밖
+### 파일럿 전 필요 후보 · 미구현
+
+- Final Snapshot과 최종 대본 확정
+- 예식장 확인 흐름과 실제 사회자 전달 방식
+- A4 인쇄·PDF
+
+실사용 자료에서 확인된 역할은 `.pages`가 예식 한 건의 Final Snapshot·예식장 확인·A4 인쇄 기준 양식, `.numbers`가 여러 예식의 일정·준비 상태·음원·특이사항 운영 기준자료라는 것입니다. 원본과 개인정보는 Public GitHub에 추가하지 않습니다.
+
+### 장기 범위 · 미구현 또는 Backlog
 
 - 계정·로그인·권한
 - Supabase·RLS·실제 DB/API
@@ -61,7 +70,9 @@
 | Product Owner 사용성 QA | PO ACCEPTED | 현재 작업 대화의 대표 시나리오 확인과 Commit 승인 |
 | GitHub Pages | DEPLOYED | Actions #6 success, 공개 URL HTTP 200 |
 | 문서 복구 감사 | PASSED | Phase 6 완료 |
-| 문서 작성 | COMPLETED LOCALLY | Product Owner `문서작성승인`, Commit 전 검수 중 |
+| 문서 복구 Commit | CONFIRMED | `b6f937c` 생성 및 `origin/main` Push 확인 |
+| 문서 복구 과거 PO 승인 과정 | MISSING EVIDENCE | Git만으로 과거 승인 대화·과정을 확인할 수 없음 |
+| Documentation Baseline Alignment | IN PROGRESS | 로컬 문서 수정·검수 중, Commit·Push 전 |
 
 과거 브라우저 QA의 모든 원본 로그와 정확한 실행 시각은 저장소에 남아 있지 않아 일부 항목은 `MISSING EVIDENCE`입니다. 배포·Commit·테스트 코드로 확인 가능한 사실과 구분해 기록합니다.
 
@@ -71,7 +82,8 @@
 - `MVP_V0_1_SCOPE.md`: 기본 범위는 유효하지만 최신 UX Patch가 누락된 과거 문서
 - `ACCEPTANCE_CRITERIA.md`: 체크 상태가 현재 완료 상태와 맞지 않는 과거 문서
 - `SCRIPT_RULES.md`: 승인 대본 원문 기준으로 보존. 일부 소개 문장 UX 정책은 현재 코드와 `CONFLICT`
-- README·통합 문서: 현재 Documentation Recovery에서 갱신 중
+- README·통합 문서: Documentation Recovery는 `b6f937c`로 Commit·Push 완료, 현재 기준선 정렬 중
+- 현재 `PRD.md`: 배포된 Owner Builder·MC MVP 구현 기준. 파일럿 계획·상위 제품 PRD는 후속 분리 후보
 
 ## 위험과 차단
 
@@ -81,11 +93,12 @@
 - 브라우저 데이터 삭제 시 서버 복구 수단이 없습니다.
 - 구형 Script Rules의 소개 문장 정책과 현재 UI 정책이 일부 다릅니다.
 - QA Correction 3~5와 Preview Sync는 최신 Commit 하나에 누적되어 독립 Commit으로 분리할 수 없습니다.
+- 현재 Navy·Coral 구현과 Dark Green 방향 중 공식 디자인 기준은 Product Owner 결정 대기입니다.
 
 ### 차단
 
 - 기능 사용을 막는 차단 이슈: 없음
-- 다음 기능 Batch 시작 차단: 문서 최종 검수와 문서 Commit·Push 미완료
+- 다음 기능 Batch 시작 차단: Documentation Baseline Alignment 최종 검수와 별도 Commit 승인 미완료
 
 ## 최근 결정
 
@@ -93,14 +106,17 @@
 - Commit과 Push·배포는 별도 승인을 받습니다.
 - 최신 기능 코드가 배포된 뒤 문서 체계를 먼저 복구합니다.
 - 문서와 기능 코드를 하나의 Commit으로 섞지 않습니다.
+- 현재 구현, 파일럿 전 필요, 장기 범위를 문서에서 구분합니다.
+- 새 문서가 기준 역할을 확보하기 전 기존 문서를 삭제하거나 이동하지 않습니다.
 
 ## 다음 행동
 
-1. 생성·수정된 문서 링크와 상태값 검수
-2. 코드 변경이 포함되지 않았는지 확인
-3. Product Owner에게 문서 최종 검수 결과 보고
-4. `문서 Commit·Push 승인` 후 문서 전용 Commit과 Push
-5. Backlog 우선순위를 결정한 뒤 다음 기능 Batch 계획
+1. Documentation Baseline Alignment의 7개 문서 링크·상태·Diff 검수
+2. 코드·데이터·지정 외 파일 변경이 포함되지 않았는지 확인
+3. Product Owner에게 로컬 문서 변경 결과 보고
+4. 별도 Commit 승인 후 승인 파일만 stage·Commit
+5. 별도 Push 승인 후 원격 반영
+6. Backlog 우선순위를 결정한 뒤 다음 기능 Batch 계획
 
 ## 역할
 

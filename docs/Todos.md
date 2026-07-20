@@ -1,6 +1,6 @@
 # YesikNote 개발 체크리스트
 
-최종 갱신일: 2026-07-17
+최종 갱신일: 2026-07-20
 
 ## 완료
 
@@ -22,13 +22,18 @@
 - [x] GitHub Actions #6 성공
 - [x] GitHub Pages 공개 화면 확인
 - [x] Documentation Recovery 읽기 전용 감사
-
-## 진행 중
-
 - [x] README 현재 상태 병합
 - [x] 프로젝트 현황·PRD·Todos 초안 작성
 - [x] Decisions·Changelog·QA Log·Backlog·Workflow 초안 작성
 - [x] 문서 링크·상태·충돌 최종 검수
+- [x] Documentation Recovery 문서 Commit `b6f937c` 생성
+- [x] Commit `b6f937c`의 `origin/main` Push 확인
+
+## 진행 중
+
+- [x] Documentation Baseline Alignment 7개 문서 로컬 정렬
+- [x] 지정 파일·링크·Commit 상태·Diff 최종 검수
+- [ ] Product Owner의 변경 내용 확인
 
 ## Product Owner 확인
 
@@ -45,20 +50,22 @@
 - [x] `UNKNOWN`, `CONFLICT`, `MISSING EVIDENCE` 누락 확인
 - [x] 코드·테스트 파일이 문서 Diff에 포함되지 않았는지 확인
 
-## Commit 대기
+## Documentation Baseline Alignment Commit 대기
 
-- [ ] Product Owner의 `문서 Commit·Push 승인`
-- [ ] 문서 파일만 명시적으로 stage
+- [ ] Product Owner의 별도 Commit 승인
+- [ ] 승인된 7개 문서만 명시적으로 stage
 - [ ] 문서 전용 Commit 생성
 
 ## Push·배포 대기
 
-- [ ] 문서 Commit을 `origin/main`에 일반 Push
+- [ ] Product Owner의 별도 Push 승인
+- [ ] 문서 Commit을 원격에 일반 Push
 - [ ] GitHub README와 문서 링크 확인
 - [ ] 기능 Pages 회귀 여부 확인
 
 ## 다음 Batch
 
+- [ ] 후속 문서 후보를 별도 Batch로 승인: MVP Owner Builder Specification → Pilot Plan & Finalization Requirements → Upper Product PRD → Product Vision → Design System → Wireframes
 - [ ] Backlog에서 한 가지 목적만 선택
 - [ ] 읽기 전용 기준선 감사
 - [ ] 수정 파일·데이터·테스트·Rollback 계획 승인

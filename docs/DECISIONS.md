@@ -133,13 +133,31 @@
 ## DEC-011 — 기능 배포 후 문서 체계 우선 복구
 
 - 날짜: 2026-07-17
-- 상태: ACCEPTED · IN PROGRESS
-- 결정자: Product Owner
+- 상태: CONFIRMED · COMMIT/PUSH CONFIRMED
+- 결정자: Product Owner · 과거 승인 과정의 원본 근거 `MISSING EVIDENCE`
 - 최종 결정: 다음 기능 Batch 전에 README·현황·PRD·Todos·결정·변경·QA·Backlog·Workflow를 복구합니다.
 - 이유: 코드와 의사결정, QA, 다음 우선순위를 한 기준에서 추적하기 위해서입니다.
 - 코드 영향: 없음
 - 문서 영향: 문서 8개 신규, README·AGENTS 병합
-- 되돌릴 조건: 문서 최종 검수 실패
+- Git 근거: Commit `b6f937c`가 2026-07-17 생성되었고 현재 `main`과 `origin/main`이 같은 Commit을 가리킴
+- 승인 근거: `b6f937c`의 과거 Product Owner 승인 대화·과정은 Git에서 확인되지 않아 `MISSING EVIDENCE`
+- 되돌릴 조건: 문서 기준선 검수 실패
 - 관련 Batch: Documentation Recovery
-- 관련 Commit: 아직 없음
+- 관련 Commit: `b6f937c`
 
+## DEC-012 — 문서 역할과 범위를 단계적으로 분리
+
+- 날짜: 2026-07-20
+- 상태: ACCEPTED · DOCUMENTATION IN PROGRESS
+- 결정자: Product Owner
+- 최종 결정: 현재 PRD는 배포된 Owner Builder·MC MVP 구현 기준으로 유지하고, 현재 구현·파일럿 전 필요·장기 범위를 구분합니다.
+- 문서 정리 원칙: 기존 문서를 먼저 삭제하거나 이동하지 않고, 새 문서가 기준 역할을 확보한 뒤 중복을 정리합니다.
+- 후속 문서 후보 순서: MVP Owner Builder Specification → Pilot Plan & Finalization Requirements → Upper Product PRD → Product Vision → Design System → Wireframes
+- 범위 주의: 후보 순서는 작성 순서이며 모든 문서를 제품 기능보다 먼저 작성한다는 뜻이 아닙니다.
+- 실사용 자료: `.pages`는 예식 한 건의 Final Snapshot·예식장 확인·A4 인쇄 기준 양식, `.numbers`는 여러 예식의 일정·준비 상태·음원·특이사항 운영 기준자료로만 참조합니다.
+- 공개 저장소 정책: 실사용 원본과 개인정보를 Public GitHub에 추가하지 않습니다.
+- 디자인 상태: 현재 Navy·Coral 구현과 Dark Green 방향은 함께 Product Owner 결정 대기이며 이번 Batch에서 확정하지 않습니다.
+- 변경 통제: 문서 Commit과 Push는 별도 승인을 받습니다.
+- 코드·데이터 영향: 없음
+- 관련 Batch: Documentation Baseline Alignment
+- 관련 Commit: 아직 없음
