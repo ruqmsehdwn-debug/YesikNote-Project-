@@ -25,20 +25,25 @@
 ### 범위 구분
 
 - 현재 MVP: 위 Owner Builder와 같은 브라우저의 MC 읽기 전용 화면
-- 파일럿 전 필요 후보: Final Snapshot, 예식장 확인 흐름, A4 인쇄, 실제 사회자 전달 방식. 모두 아직 구현되지 않았으며 별도 Product Owner 승인과 Batch가 필요합니다.
-- 장기 범위: Auth·Supabase·RLS, 역할별 공유, VenueAdmin, Guest, Audit Trail 등. 현재는 Backlog 또는 설계 감사 대상입니다.
+- 파일럿 전 검토 범위: 예식별 분리 저장, 예식 생성·목록·검색, 작성·검토·확정 상태, 로그인과 역할별 권한, 서버 저장, Final Snapshot, 예식장 읽기 전용 확인, A4 인쇄·PDF, 백업·복원, 마지막 수정 시간, 개인정보 안내·보관·삭제 기준, 장애 대응
+- 파일럿 전 검토 후보: 최소 변경 이력. 파일럿 필수로 확정하지 않았으며 상세 데이터 구조는 별도 Batch에서 검토합니다.
+- 장기 범위: 예식장 CRM, 계약·결제, 파트너·상품 판매, Wedding Data OS
+
+파일럿 전·장기 범위는 모두 미구현이며, 항목별 구현과 상세 설계에는 별도 Product Owner 승인이 필요합니다.
 
 현재 [제품 요구사항](./docs/PRD.md)은 배포된 Owner Builder·MC MVP의 구현 기준 문서입니다. 파일럿 계획과 상위 제품 PRD는 후속 문서 후보이며 이번 문서 Batch에서 작성하지 않습니다.
 
 ## 현재 프로젝트 상태
 
 - 기준 Branch: `main`
-- 현재 로컬 작업 Branch: `work/documentation-baseline-alignment`
-- 현재 저장소 기준 Commit: `b6f937c3e4876f02b2a6099bdf13a70bda45319e`
+- `main` 문서 기준 Commit: `b6f937c3e4876f02b2a6099bdf13a70bda45319e`
+- 작업 Branch: `work/documentation-baseline-alignment`
+- 작업 PR: [#2 Documentation Baseline Alignment](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/pull/2) · Draft
+- 최신 작업 Commit: PR #2의 Head를 기준으로 확인
 - 최신 기능 Commit: `6e136bcf9ac4e347df71654f609fc729a79885f0`
 - 최신 배포 Commit: `6e136bcf9ac4e347df71654f609fc729a79885f0`
 - 문서 복구: Commit `b6f937c` 생성 및 `origin/main` Push 확인
-- 현재 단계: Documentation Baseline Alignment · 로컬 작업 중, Commit 전
+- 현재 단계: Documentation Baseline Alignment · PR #2 Draft 검토
 - 자동 테스트: 135개 통과 기록
 - 공개 화면: [GitHub Pages](https://ruqmsehdwn-debug.github.io/YesikNote-Project-/)
 - 배포 기록: [GitHub Actions](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/actions/runs/29521311659)

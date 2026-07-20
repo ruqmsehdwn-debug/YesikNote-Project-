@@ -5,10 +5,12 @@
 ## Unreleased — Documentation Baseline Alignment
 
 - README, Project Ledger, PRD, Todos, Decisions, Changelog, 기존 Acceptance Criteria의 역할·상태 정렬
-- 현재 MVP, 파일럿 전 필요 후보, 장기 범위를 구분
+- 현재 MVP, 파일럿 전 검토 범위, 장기 범위를 구분
 - Documentation Recovery Commit·Push 사실과 과거 승인 근거의 `MISSING EVIDENCE`를 구분
 - 코드·데이터 변경 없음
-- 아직 Commit·Push되지 않음
+- 초기 정렬 Commit `981a4e6`을 작업 Branch에 Push하고 Draft PR [#2](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/pull/2) 생성
+- PR #2 정정: 파일럿 전 검토 범위, 최소 변경 이력 후보, 장기 범위, DEC-012 후속 문서 순서의 `PROPOSED` 상태 정렬
+- 최신 정정 Commit은 PR #2의 Head를 기준으로 확인
 
 ## 2026-07-17 — Documentation Recovery
 

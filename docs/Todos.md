@@ -1,6 +1,6 @@
 # YesikNote 개발 체크리스트
 
-최종 갱신일: 2026-07-20
+최종 갱신일: 2026-07-21
 
 ## 완료
 
@@ -28,12 +28,18 @@
 - [x] 문서 링크·상태·충돌 최종 검수
 - [x] Documentation Recovery 문서 Commit `b6f937c` 생성
 - [x] Commit `b6f937c`의 `origin/main` Push 확인
+- [x] Documentation Baseline Alignment 초기 Commit `981a4e6` 생성·Push
+- [x] Draft PR [#2](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/pull/2) 생성
 
-## 진행 중
+## PR #2 정정 완료
 
 - [x] Documentation Baseline Alignment 7개 문서 로컬 정렬
 - [x] 지정 파일·링크·Commit 상태·Diff 최종 검수
-- [ ] Product Owner의 변경 내용 확인
+- [x] Product Owner의 정정 Batch 승인
+- [x] 파일럿 전 검토 범위와 장기 범위 정렬
+- [x] 최소 변경 이력을 파일럿 비필수 검토 후보로 표시
+- [x] DEC-012 후속 문서 순서를 `PROPOSED`로 정정
+- [x] 승인된 5개 문서 정정 Commit·Push 및 PR #2 Head 확인
 
 ## Product Owner 확인
 
@@ -50,22 +56,23 @@
 - [x] `UNKNOWN`, `CONFLICT`, `MISSING EVIDENCE` 누락 확인
 - [x] 코드·테스트 파일이 문서 Diff에 포함되지 않았는지 확인
 
-## Documentation Baseline Alignment Commit 대기
+## Documentation Baseline Alignment Git 상태
 
-- [ ] Product Owner의 별도 Commit 승인
-- [ ] 승인된 7개 문서만 명시적으로 stage
-- [ ] 문서 전용 Commit 생성
+- [x] Product Owner의 초기 Commit·Push 승인
+- [x] 승인된 7개 문서만 명시적으로 stage
+- [x] 문서 전용 Commit 생성
+- [x] 작업 Branch Push
+- [x] Draft PR #2 생성
 
-## Push·배포 대기
+## PR 후속 승인 대기
 
-- [ ] Product Owner의 별도 Push 승인
-- [ ] 문서 Commit을 원격에 일반 Push
-- [ ] GitHub README와 문서 링크 확인
-- [ ] 기능 Pages 회귀 여부 확인
+- [ ] PR Ready 전환 승인
+- [ ] merge 승인
+- [ ] 배포 승인
 
 ## 다음 Batch
 
-- [ ] 후속 문서 후보를 별도 Batch로 승인: MVP Owner Builder Specification → Pilot Plan & Finalization Requirements → Upper Product PRD → Product Vision → Design System → Wireframes
+- [ ] `PROPOSED` 후속 문서 후보를 개별 Batch로 승인: MVP Owner Builder Specification → Pilot Plan & Finalization Requirements → Upper Product PRD → Product Vision → Design System → Wireframes
 - [ ] Backlog에서 한 가지 목적만 선택
 - [ ] 읽기 전용 기준선 감사
 - [ ] 수정 파일·데이터·테스트·Rollback 계획 승인
