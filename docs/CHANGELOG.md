@@ -2,11 +2,25 @@
 
 날짜와 Commit이 Git에서 확인되는 변경만 확정 기록합니다. 독립 Commit이 없는 QA Correction은 최신 누적 Commit 아래에 포함합니다.
 
-## Unreleased — Documentation Recovery
+## Unreleased — Documentation Baseline Alignment
+
+- README, Project Ledger, PRD, Todos, Decisions, Changelog, 기존 Acceptance Criteria의 역할·상태 정렬
+- 현재 MVP, 파일럿 전 검토 범위, 장기 범위를 구분
+- Documentation Recovery Commit·Push 사실과 과거 승인 근거의 `MISSING EVIDENCE`를 구분
+- 코드·데이터 변경 없음
+- 초기 정렬 Commit `981a4e6`을 작업 Branch에 Push하고 Draft PR [#2](https://github.com/ruqmsehdwn-debug/YesikNote-Project-/pull/2) 생성
+- PR #2 정정: 파일럿 전 검토 범위, 최소 변경 이력 후보, 장기 범위, DEC-012 후속 문서 순서의 `PROPOSED` 상태 정렬
+- 최신 정정 Commit은 PR #2의 Head를 기준으로 확인
+
+## 2026-07-17 — Documentation Recovery
+
+Commit: `b6f937c` · `docs(project): restore YesikNote project ledger and governance`
 
 - README와 AGENTS를 현재 운영 상태에 맞게 병합
 - 프로젝트 현황, PRD, Todos, Decisions, QA Log, Backlog, Workflow 복구
 - 코드 변경 없음
+- Commit 생성과 `origin/main` Push 확인
+- 과거 Product Owner 승인 대화·과정은 `MISSING EVIDENCE`
 
 ## 2026-07-17 — Post-Patch QA·Owner UX 안정화
 
@@ -75,4 +89,3 @@ Commit: `114ad94` · `Implement Owner Builder MVP v1.4`
 ## 2026-07-13 — 저장소 생성
 
 Commit: `bfd7b2b` · `Initial commit`
-
