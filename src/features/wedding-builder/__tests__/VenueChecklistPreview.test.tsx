@@ -93,8 +93,10 @@ describe('VenueChecklistPreview', () => {
 
     const declarationRow = checklistRow(view, '성혼선언');
     const performanceRow = checklistRow(view, '축가·축무');
+    expect(within(declarationRow).getByText('진행자')).toBeInTheDocument();
     expect(within(declarationRow).getByText(/신랑 어머님/)).toBeInTheDocument();
     expect(within(performanceRow).getByText(/축가 2곡/)).toBeInTheDocument();
+    expect(within(performanceRow).getAllByText('축가자')).toHaveLength(2);
     expect(within(performanceRow).getByText(/첫 번째 곡/)).toBeInTheDocument();
     expect(within(performanceRow).getByText(/두 번째 곡/)).toBeInTheDocument();
   });
@@ -116,7 +118,8 @@ describe('VenueChecklistPreview', () => {
     const view = preview(draft);
     const declarationRow = checklistRow(view, '성혼선언');
 
-    expect(within(declarationRow).getByText('미진행')).toBeInTheDocument();
+    expect(within(declarationRow).getByText('미진행'))
+      .toHaveClass('status-badge', 'inactive');
     expect(view.queryByText(/정책 확인 필요/)).not.toBeInTheDocument();
   });
 

@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CeremonyItem } from '../models/ceremony';
+import { StatusBadge } from './StatusBadge';
 
 type Props = {
   items: CeremonyItem[];
@@ -76,9 +77,15 @@ function SortableRow({
         <span className="item-index">{index + 1}</span>
         <span>
           <strong>{item.title}</strong>
-          <small>{item.active ? '진행' : '미진행 · 입력값 보존'}</small>
+          <small>{item.active ? '예식에서 진행하는 식순' : '작성한 내용 보관 중'}</small>
         </span>
       </button>
+      <StatusBadge
+        tone={item.active ? 'complete' : 'inactive'}
+        className="item-status"
+      >
+        {item.active ? '진행' : '미진행'}
+      </StatusBadge>
       {!compact && item.type === 'speech' && onSpeechTypeChange && (
         <div className="order-speech-type" role="group" aria-label={`${index + 1}번 말하기 종류`}>
           <button
@@ -100,11 +107,56 @@ function SortableRow({
         </div>
       )}
       <div className="item-actions">
-        <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="위로 이동">↑</button>
-        <button type="button" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="아래로 이동">↓</button>
-        {onToggle && <button type="button" onClick={onToggle}>{item.active ? '미진행' : '진행'}</button>}
-        {!compact && onDuplicate && <button type="button" onClick={onDuplicate}>복제</button>}
-        {!compact && onDelete && <button type="button" className="danger" onClick={onDelete}>삭제</button>}
+        <button
+          type="button"
+          className="icon-action"
+          onClick={() => onMove(-1)}
+          disabled={index === 0}
+          aria-label="위로 이동"
+          title={`${item.title} 위로 이동`}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="icon-action"
+          onClick={() => onMove(1)}
+          disabled={index === total - 1}
+          aria-label="아래로 이동"
+          title={`${item.title} 아래로 이동`}
+        >
+          ↓
+        </button>
+        {!compact && onDuplicate && (
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={onDuplicate}
+            aria-label={`${item.title} 복제`}
+          >
+            <span aria-hidden="true">⧉</span> 복제
+          </button>
+        )}
+        {onToggle && (
+          <button
+            type="button"
+            className="status-action"
+            onClick={onToggle}
+            aria-label={item.active ? '미진행' : '진행'}
+          >
+            {item.active ? '미진행으로 변경' : '다시 진행'}
+          </button>
+        )}
+        {!compact && onDelete && (
+          <button
+            type="button"
+            className="danger"
+            onClick={onDelete}
+            aria-label={`${item.title} 삭제`}
+          >
+            삭제
+          </button>
+        )}
       </div>
     </div>
   );

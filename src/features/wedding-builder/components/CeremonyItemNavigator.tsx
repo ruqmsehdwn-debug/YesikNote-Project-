@@ -4,6 +4,7 @@ import type {
   ValidationIssue,
 } from '../models/ceremony';
 import { ceremonyItemDisplayTitle } from '../services/scriptEngine';
+import { StatusBadge } from './StatusBadge';
 
 type Props = {
   items: CeremonyItem[];
@@ -105,9 +106,9 @@ export function CeremonyItemNavigator({
         <div className="ceremony-mobile-current" aria-live="polite">
           <span>현재 선택</span>
           <strong>{selectedItem.order + 1}. {ceremonyItemDisplayTitle(selectedItem)}</strong>
-          <em className={`ceremony-nav-status ${selectedStatus}`}>
+          <StatusBadge tone={selectedStatus} className="ceremony-nav-status">
             {statusLabels[selectedStatus]}
-          </em>
+          </StatusBadge>
         </div>
       )}
 
@@ -137,9 +138,9 @@ export function CeremonyItemNavigator({
                 >
                   <span className="ceremony-nav-number">{item.order + 1}</span>
                   <strong>{ceremonyItemDisplayTitle(item)}</strong>
-                  <span className={`ceremony-nav-status ${status}`}>
+                  <StatusBadge tone={status} className="ceremony-nav-status">
                     {statusLabels[status]}
-                  </span>
+                  </StatusBadge>
                 </button>
               </li>
             );
