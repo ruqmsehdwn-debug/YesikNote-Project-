@@ -19,6 +19,8 @@ import { ceremonyItemDisplayTitle, generateScript } from '../services/scriptEngi
 import { ItemDetailEditor } from '../components/ItemDetailEditor';
 import { ScriptPreview } from '../components/ScriptPreview';
 import { SortableItemList } from '../components/SortableItemList';
+import { VenueChecklistPreview } from '../components/VenueChecklistPreview';
+import { buildCeremonyProjection } from '../services/ceremonyProjection';
 
 type Props = {
   draft: CeremonyDraft;
@@ -53,6 +55,7 @@ export function OwnerBuilderPage({
   const [performanceFocusTarget, setPerformanceFocusTarget] = useState<{ ceremonyItemId: string; section?: string; performanceId?: string; field?: string; requestId: number }>();
   const editRequestRef = useRef(0);
   const script = useMemo(() => generateScript(draft), [draft]);
+  const ceremonyProjection = useMemo(() => buildCeremonyProjection(draft), [draft]);
   const issues = useMemo(() => validateDraft(draft), [draft]);
   const blocking = issues.filter((issue) => issue.severity === 'blocking');
   const warnings = issues.filter((issue) => issue.severity === 'warning');
@@ -191,7 +194,7 @@ export function OwnerBuilderPage({
               ) : <EmptyCustom onAdd={() => { const custom = createCustomItem(0); updateItems([custom]); setSelectedId(custom.id); }} />}
             </div>
           )}
-          {step === 5 && <ReviewStep draft={draft} script={script} blocking={blocking} warnings={warnings} onEdit={(issue) => {
+          {step === 5 && <ReviewStep draft={draft} script={script} projection={ceremonyProjection} blocking={blocking} warnings={warnings} onEdit={(issue) => {
             const ceremonyItemId = issue.ceremonyItemId ?? issue.itemId;
             if (!ceremonyItemId && issue.field) {
               setBasicFocusTarget({ field: issue.field, requestId: ++editRequestRef.current });
@@ -297,7 +300,7 @@ function reviewGuidance(rate: number, remainingCount: number) {
   return '준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.';
 }
 
-function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (issue: ValidationIssue) => void }) {
+function ReviewStep({ draft, script, projection, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; projection: ReturnType<typeof buildCeremonyProjection>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (issue: ValidationIssue) => void }) {
   const rate = completionRate(draft);
   const activeOutputCount = script.ceremonySections.filter((section) => !section.parentId).length;
   return (
@@ -308,6 +311,7 @@ function ReviewStep({ draft, script, blocking, warnings, onEdit }: { draft: Cere
       {!!warnings.length && <IssueList title="순서를 한번 확인해 주세요" issues={warnings} items={draft.items} onEdit={onEdit} warning />}
       {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다.</div>}
       {draft.basicInfo.globalRequestNote && <div className="global-note"><span>전체 요청사항</span><p>{draft.basicInfo.globalRequestNote}</p></div>}
+      <VenueChecklistPreview projection={projection} />
       <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>}{!!section.note.length && <div className="inline-note"><strong>주의사항 / 실행 메모</strong>{section.note.join(' · ')}</div>}</div></article>)}</div>
     </div>
   );
