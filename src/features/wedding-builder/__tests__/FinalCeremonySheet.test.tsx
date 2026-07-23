@@ -120,6 +120,29 @@ describe('FinalCeremonySheet', () => {
     expect(within(timeValue).getByText('확인 필요')).toBeInTheDocument();
   });
 
+  it('예식 형태와 주례 유무를 중복 표시하지 않고 주례 정보만 조건부 표시한다', () => {
+    const noOfficiantView = renderSheet(createDraft('no_officiant'));
+    openFullTable(noOfficiantView);
+    expect(noOfficiantView.getByText('주례 없는 예식')).toBeInTheDocument();
+    expect(noOfficiantView.queryByText('주례 유무')).not.toBeInTheDocument();
+    expect(noOfficiantView.queryByText('주례 정보')).not.toBeInTheDocument();
+    cleanup();
+
+    const draft = createDraft('officiant');
+    const officiant = draft.items.find((item) => item.type === 'officiant_entrance')!;
+    officiant.participants = [{
+      id: 'officiant-person',
+      role: 'officiant',
+      name: '김주례',
+      relation: '대학 은사',
+    }];
+    const officiantView = renderSheet(draft);
+    openFullTable(officiantView);
+    const info = officiantView.getByText('주례 정보').closest('div')!;
+    expect(within(info).getByText('김주례 · 대학 은사')).toBeInTheDocument();
+    expect(officiantView.queryByText('주례 유무')).not.toBeInTheDocument();
+  });
+
   it('active=false 입력 데이터와 원본 Draft를 변경하지 않는다', () => {
     const draft = createDraft();
     const declaration = draft.items.find((item) => item.type === 'pronouncement')!;

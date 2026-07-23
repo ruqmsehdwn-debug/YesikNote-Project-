@@ -54,6 +54,7 @@ export type CeremonyProjection = {
     status: ProjectionStatus;
   };
   officiantType: 'officiant' | 'no_officiant' | 'unknown';
+  officiant: CeremonyProjectionSummary;
   candleLighting: CeremonyProjectionSummary;
   vow: CeremonyProjectionSummary;
   declaration: CeremonyProjectionSummary;
@@ -138,6 +139,42 @@ function participantLabel(item: CeremonyItem) {
     || participant.name.trim()
     || participant.relation?.trim()
     || undefined;
+}
+
+function buildOfficiant(
+  draft: CeremonyDraft,
+  warnings: string[],
+): CeremonyProjectionSummary {
+  if (draft.ceremonyType === 'no_officiant') {
+    return {
+      sourceId: null,
+      active: false,
+      summary: '해당 없음',
+      status: 'known',
+    };
+  }
+  if (draft.ceremonyType !== 'officiant') return unknownSummary();
+
+  const item = findItem(draft, 'officiant_entrance');
+  if (!item || !item.active) {
+    warnings.push('주례 소개(등단) 항목을 확인해 주세요.');
+    return item ? inactiveSummary(item) : unknownSummary();
+  }
+
+  const participant = item.participants?.[0];
+  const name = participant?.displayTitle?.trim() || participant?.name.trim();
+  const relation = participant?.relation?.trim();
+  const summary = [name, relation].filter(Boolean).join(' · ');
+  if (!summary) {
+    warnings.push(`주례 성함 또는 직함·관계를 입력해 주세요. (${item.id})`);
+  }
+  return {
+    sourceId: item.id,
+    active: true,
+    summary: summary || '확인 필요',
+    participant: summary || undefined,
+    status: summary ? 'known' : 'unknown',
+  };
 }
 
 function buildCandleLighting(
@@ -435,6 +472,7 @@ export function buildCeremonyProjection(
     findItem(draft, 'candle_lighting'),
     sourceWarnings,
   );
+  const officiant = buildOfficiant(draft, sourceWarnings);
   const vow = buildVow(findItem(draft, 'vows'), sourceWarnings);
   const declaration = buildDeclaration(
     findItem(draft, 'pronouncement'),
@@ -486,6 +524,7 @@ export function buildCeremonyProjection(
       : draft.ceremonyType === 'no_officiant'
         ? 'no_officiant' as const
         : 'unknown' as const,
+    officiant,
     candleLighting,
     vow,
     declaration,

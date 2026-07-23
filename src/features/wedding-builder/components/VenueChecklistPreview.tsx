@@ -27,16 +27,17 @@ function displayWarning(value: string) {
 }
 
 export function VenueChecklistPreview({ projection, onNavigate }: Props) {
-  const officiant = projection.officiantType === 'officiant'
-    ? '주례 있음'
-    : projection.officiantType === 'no_officiant'
-      ? '무주례'
-      : '확인 필요';
   const rows = [
     ['예식 형태', projection.ceremonyType.status === 'known'
       ? projection.ceremonyType.label
       : '확인 필요', undefined],
-    ['주례 유무', officiant, undefined],
+    ...(projection.officiantType === 'officiant'
+      ? [[
+        '주례 정보',
+        summaryValue(projection.officiant),
+        projection.officiant.sourceId ?? undefined,
+      ] as const]
+      : []),
     ['화촉점화', summaryValue(projection.candleLighting), projection.candleLighting.sourceId ?? undefined],
     ['신랑 입장', summaryValue(projection.entrance.groom), projection.entrance.groom.sourceId ?? undefined],
     ['신부 입장 및 동반자', summaryValue(projection.entrance.bride), projection.entrance.bride.sourceId ?? undefined],

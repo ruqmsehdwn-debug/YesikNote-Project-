@@ -36,10 +36,28 @@ describe('VenueChecklistPreview', () => {
     })).toBeInTheDocument();
     expect(view.getByText('편집 불가')).toBeInTheDocument();
     expect(view.getByText('주례 없는 예식')).toBeInTheDocument();
-    expect(view.getByText('무주례')).toBeInTheDocument();
+    expect(view.queryByText('주례 유무', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(view.queryByText('무주례')).not.toBeInTheDocument();
     expect(view.getByText('양가 부모님 및 내빈께 인사', {
       selector: 'dt',
     })).toBeInTheDocument();
+  });
+
+  it('주례 있는 예식에서만 성함과 직함·관계를 별도 정보로 표시한다', () => {
+    const draft = createDraft('officiant');
+    const officiant = draft.items.find((item) => item.type === 'officiant_entrance')!;
+    officiant.participants = [{
+      id: 'officiant-person',
+      role: 'officiant',
+      name: '김주례',
+      relation: '대학 은사',
+    }];
+    const view = preview(draft);
+    const officiantRow = checklistRow(view, '주례 정보');
+
+    expect(view.getByText('주례 있는 예식')).toBeInTheDocument();
+    expect(within(officiantRow).getByText('김주례 · 대학 은사')).toBeInTheDocument();
+    expect(view.queryByText('주례 유무', { selector: 'dt' })).not.toBeInTheDocument();
   });
 
   it('성혼선언 주체와 축가 2곡 정보를 같은 Projection에서 표시한다', () => {
