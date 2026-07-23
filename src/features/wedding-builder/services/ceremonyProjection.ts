@@ -3,6 +3,7 @@ import type {
   CeremonyItem,
   CeremonyType,
   PerformanceItem,
+  ScriptPackage,
 } from '../models/ceremony';
 import { generateScript } from './scriptEngine';
 
@@ -414,7 +415,10 @@ function summaryForChecklistItem(
   return '진행';
 }
 
-export function buildCeremonyProjection(draft: CeremonyDraft): CeremonyProjection {
+export function buildCeremonyProjection(
+  draft: CeremonyDraft,
+  sharedScript?: ScriptPackage,
+): CeremonyProjection {
   const sourceWarnings: string[] = [];
   const items = sortedItems(draft);
   items
@@ -514,7 +518,7 @@ export function buildCeremonyProjection(draft: CeremonyDraft): CeremonyProjectio
       summary: summaryForChecklistItem(item, projectionBase),
     }));
 
-  const script = generateScript(draft);
+  const script = sharedScript ?? generateScript(draft);
   const participantBySourceId = new Map<string, string | undefined>([
     [vow.sourceId ?? '', vow.participant],
     [declaration.sourceId ?? '', declaration.participant],

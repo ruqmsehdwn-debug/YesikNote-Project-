@@ -21,6 +21,10 @@ function speechValue(
   return summary.summary.startsWith(kind) ? summaryValue(summary) : '확인 필요';
 }
 
+function displayWarning(value: string) {
+  return value.replace(/ \([a-z0-9-]{20,}\)$/i, '');
+}
+
 export function VenueChecklistPreview({ projection }: Props) {
   const officiant = projection.officiantType === 'officiant'
     ? '주례 있음'
@@ -58,18 +62,24 @@ export function VenueChecklistPreview({ projection }: Props) {
         <span className="readonly-badge">편집 불가</span>
       </header>
 
-      <dl className="venue-checklist-grid">
-        {rows.map(([label, value]) => (
-          <div className="venue-checklist-row" key={label}>
-            <dt>{label}</dt>
-            <dd className={value === '확인 필요' ? 'needs-confirmation' : ''}>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <details className="venue-checklist-details">
+        <summary>예식장 확인용 전체 요약 보기</summary>
+        <dl className="venue-checklist-grid">
+          {rows.map(([label, value]) => (
+            <div className="venue-checklist-row" key={label}>
+              <dt>{label}</dt>
+              <dd className={value === '확인 필요' ? 'needs-confirmation' : ''}>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
 
-      {!!projection.notes.length && (
-        <section className="venue-checklist-notes" aria-labelledby="venue-notes-title">
-          <h3 id="venue-notes-title">현장 비고</h3>
+      <details className="venue-checklist-notes">
+        <summary>
+          현장 비고 {projection.notes.length}개 · 확인 필요 {projection.sourceWarnings.length}개
+          <small>예식 당일 확인할 진행 메모입니다.</small>
+        </summary>
+        {projection.notes.length ? (
           <ul>
             {projection.notes.map((note) => (
               <li key={`${note.sourceId}-${note.value}`}>
@@ -78,17 +88,17 @@ export function VenueChecklistPreview({ projection }: Props) {
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : <p>현재 등록된 현장 비고가 없습니다.</p>}
+      </details>
 
-      <section className="venue-checklist-warnings" aria-labelledby="venue-warnings-title">
-        <h3 id="venue-warnings-title">확인 필요</h3>
-        {projection.sourceWarnings.length ? (
+      {!!projection.sourceWarnings.length && (
+        <details className="venue-checklist-warnings">
+          <summary>예식장 확인 필요사항 {projection.sourceWarnings.length}개</summary>
           <ul>
-            {projection.sourceWarnings.map((warning) => <li key={warning}>{warning}</li>)}
+            {projection.sourceWarnings.map((warning) => <li key={warning}>{displayWarning(warning)}</li>)}
           </ul>
-        ) : <p>현재 Projection에서 추가로 확인할 항목이 없습니다.</p>}
-      </section>
+        </details>
+      )}
     </section>
   );
 }

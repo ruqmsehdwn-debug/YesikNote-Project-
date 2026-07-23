@@ -88,7 +88,7 @@ describe('VenueChecklistPreview', () => {
 
     expect(within(materialRow).getByText('확인 필요')).toBeInTheDocument();
     expect(within(musicRow).getByText('확인 필요')).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: '확인 필요' })).toBeInTheDocument();
+    expect(view.getByText(/예식장 확인 필요사항 \d+개/)).toBeInTheDocument();
   });
 
   it('active=false 항목은 미진행으로 보이되 미확정 정책 경고를 함께 표시한다', () => {

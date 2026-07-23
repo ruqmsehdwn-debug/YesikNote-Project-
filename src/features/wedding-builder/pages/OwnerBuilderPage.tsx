@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   createCustomItem,
@@ -21,6 +21,10 @@ import { ScriptPreview } from '../components/ScriptPreview';
 import { SortableItemList } from '../components/SortableItemList';
 import { VenueChecklistPreview } from '../components/VenueChecklistPreview';
 import { FinalCeremonySheet } from '../components/FinalCeremonySheet';
+import {
+  ToastRegion,
+  type ToastMessage,
+} from '../components/ToastRegion';
 import { buildCeremonyProjection } from '../services/ceremonyProjection';
 
 type Props = {
@@ -28,7 +32,7 @@ type Props = {
   setDraft: (update: CeremonyDraft | ((previous: CeremonyDraft) => CeremonyDraft)) => void;
   saveStatus: SaveStatus;
   lastSavedAt: string | null;
-  onSaveNow?: () => void;
+  onSaveNow?: () => boolean;
   compositionHandlers: {
     onCompositionStart: () => void;
     onCompositionEnd: () => void;
@@ -54,9 +58,14 @@ export function OwnerBuilderPage({
   const [selectedId, setSelectedId] = useState(draft.items[0]?.id);
   const [basicFocusTarget, setBasicFocusTarget] = useState<BasicFocusTarget>();
   const [performanceFocusTarget, setPerformanceFocusTarget] = useState<{ ceremonyItemId: string; section?: string; performanceId?: string; field?: string; requestId: number }>();
+  const [toast, setToast] = useState<ToastMessage>();
+  const toastIdRef = useRef(0);
   const editRequestRef = useRef(0);
   const script = useMemo(() => generateScript(draft), [draft]);
-  const ceremonyProjection = useMemo(() => buildCeremonyProjection(draft), [draft]);
+  const ceremonyProjection = useMemo(
+    () => buildCeremonyProjection(draft, script),
+    [draft, script],
+  );
   const issues = useMemo(() => validateDraft(draft), [draft]);
   const blocking = issues.filter((issue) => issue.severity === 'blocking');
   const warnings = issues.filter((issue) => issue.severity === 'warning');
@@ -68,8 +77,13 @@ export function OwnerBuilderPage({
     ? { ...selectedItem, title: ceremonyItemDisplayTitle(selectedItem) }
     : undefined;
 
+  const notify = useCallback((text: string) => {
+    setToast({ id: ++toastIdRef.current, text });
+  }, []);
+
   const setStep = (next: number) => {
     const value = Math.min(Math.max(next, 1), 5);
+    if (value === 5 && step !== 5) notify('최종 식순표 업데이트 완료');
     setStepState(value);
     setDraft((previous) => ({ ...previous, lastStep: value }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -118,7 +132,9 @@ export function OwnerBuilderPage({
           <span className="role-badge" aria-label="현재 화면: 신랑·신부용">신랑·신부용</span>
           <span className={`save-dot ${saveStatus}`} />
           <span>{saveStatus === 'saving' ? '저장 중…' : saveStatus === 'failed' ? '저장하지 못했어요' : saveStatus === 'saved' ? '자동 저장됨' : '자동 저장'}{lastSavedAt && saveStatus === 'saved' ? ` · ${new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
-          {onSaveNow && <button type="button" className="save-now-button" onClick={onSaveNow}>{saveStatus === 'failed' ? '다시 저장' : '저장'}</button>}
+          {onSaveNow && <button type="button" className="save-now-button" onClick={() => {
+            if (onSaveNow()) notify('저장 완료');
+          }}>{saveStatus === 'failed' ? '다시 저장' : '저장'}</button>}
         </div>
       </header>
 
@@ -143,6 +159,10 @@ export function OwnerBuilderPage({
               draft={draft}
               selectedId={selectedId}
               onItemsChange={updateItems}
+              onReorder={(items) => {
+                updateItems(items);
+                notify('식순 순서 변경 완료');
+              }}
               onSelect={(id) => { selectItem(id); setStep(4); }}
               onToggle={(id) => updateItems(draft.items.map((item) => {
                 if (item.id !== id) return item;
@@ -195,7 +215,7 @@ export function OwnerBuilderPage({
               ) : <EmptyCustom onAdd={() => { const custom = createCustomItem(0); updateItems([custom]); setSelectedId(custom.id); }} />}
             </div>
           )}
-          {step === 5 && <ReviewStep draft={draft} script={script} projection={ceremonyProjection} blocking={blocking} warnings={warnings} onEdit={(issue) => {
+          {step === 5 && <ReviewStep draft={draft} script={script} projection={ceremonyProjection} blocking={blocking} warnings={warnings} onNotify={notify} onEdit={(issue) => {
             const ceremonyItemId = issue.ceremonyItemId ?? issue.itemId;
             if (!ceremonyItemId && issue.field) {
               setBasicFocusTarget({ field: issue.field, requestId: ++editRequestRef.current });
@@ -222,6 +242,7 @@ export function OwnerBuilderPage({
         </section>
         {step >= 3 && step <= 4 && <ScriptPreview script={script} items={draft.items} selectedCeremonyItemId={selectedId} />}
       </main>
+      <ToastRegion message={toast} onDismiss={() => setToast(undefined)} />
     </div>
   );
 }
@@ -277,7 +298,7 @@ function CeremonyTypeStep({ draft, onChange }: { draft: CeremonyDraft; onChange:
   );
 }
 
-function OrderStep({ draft, selectedId, onItemsChange, onSelect, onToggle, onDuplicate, onDelete, onAdd, onReset }: { draft: CeremonyDraft; selectedId?: string; onItemsChange: (items: CeremonyItem[]) => void; onSelect: (id: string) => void; onToggle: (id: string) => void; onDuplicate: (id: string) => void; onDelete: (id: string) => void; onAdd: () => void; onReset: () => void }) {
+function OrderStep({ draft, selectedId, onItemsChange, onReorder, onSelect, onToggle, onDuplicate, onDelete, onAdd, onReset }: { draft: CeremonyDraft; selectedId?: string; onItemsChange: (items: CeremonyItem[]) => void; onReorder: (items: CeremonyItem[]) => void; onSelect: (id: string) => void; onToggle: (id: string) => void; onDuplicate: (id: string) => void; onDelete: (id: string) => void; onAdd: () => void; onReset: () => void }) {
   const storedTitles = new Map(draft.items.map((item) => [item.id, item.title]));
   const displayedItems = draft.items.map((item) => ({
     ...item,
@@ -286,7 +307,7 @@ function OrderStep({ draft, selectedId, onItemsChange, onSelect, onToggle, onDup
   return (
     <div className="page-section">
       <div className="heading-row"><div className="page-heading"><span className="section-kicker">STEP 3</span><h1>전체 식순을 완성하세요</h1><p>끌어서 옮기거나 화살표 버튼으로 순서를 조정하세요.</p></div><div className="heading-actions"><button type="button" className="button secondary" onClick={onReset} disabled={draft.ceremonyType === 'religious' || draft.ceremonyType === 'custom'}>기본 순서로 되돌리기</button><button type="button" className="button primary" onClick={onAdd}>+ 자유 식순 추가</button></div></div>
-      {draft.items.length ? <SortableItemList items={displayedItems} selectedId={selectedId} onChange={(items) => onItemsChange(items.map((item) => ({ ...item, title: storedTitles.get(item.id) ?? item.title })))} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} onSpeechTypeChange={(id, speechType) => onItemsChange(draft.items.map((item) => item.id === id ? { ...item, detailConfig: { ...item.detailConfig, speechType } } : item))} /> : <EmptyCustom onAdd={onAdd} />}
+      {draft.items.length ? <SortableItemList items={displayedItems} selectedId={selectedId} onChange={(items) => onReorder(items.map((item) => ({ ...item, title: storedTitles.get(item.id) ?? item.title })))} onSelect={onSelect} onToggle={onToggle} onDuplicate={onDuplicate} onDelete={onDelete} onSpeechTypeChange={(id, speechType) => onItemsChange(draft.items.map((item) => item.id === id ? { ...item, detailConfig: { ...item.detailConfig, speechType } } : item))} /> : <EmptyCustom onAdd={onAdd} />}
     </div>
   );
 }
@@ -301,22 +322,54 @@ function reviewGuidance(rate: number, remainingCount: number) {
   return '준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.';
 }
 
-function ReviewStep({ draft, script, projection, blocking, warnings, onEdit }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; projection: ReturnType<typeof buildCeremonyProjection>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (issue: ValidationIssue) => void }) {
+function ReviewStep({ draft, script, projection, blocking, warnings, onEdit, onNotify }: { draft: CeremonyDraft; script: ReturnType<typeof generateScript>; projection: ReturnType<typeof buildCeremonyProjection>; blocking: ReturnType<typeof validateDraft>; warnings: ReturnType<typeof validateDraft>; onEdit: (issue: ValidationIssue) => void; onNotify: (message: string) => void }) {
   const rate = completionRate(draft);
   const activeOutputCount = script.ceremonySections.filter((section) => !section.parentId).length;
+  const allIssues = [...blocking, ...warnings];
   return (
     <div className="page-section">
       <div className="page-heading"><span className="section-kicker">STEP 5</span><h1>최종 대본을 확인하세요</h1><p>{reviewGuidance(rate, blocking.length)}</p></div>
+      {(!!allIssues.length || !!projection.sourceWarnings.length) && <IssueSummary issues={allIssues} projectionWarnings={projection.sourceWarnings} items={draft.items} onEdit={onEdit} />}
       <div className="review-summary"><div><span>활성 식순</span><strong>{activeOutputCount}</strong></div><div><span>대본 섹션</span><strong>{script.ceremonySections.length}</strong></div><div><span>예상 시간</span><strong>{Math.ceil(script.totalEstimatedTimeSeconds / 60)}분</strong></div><div><span>완료 상태</span><strong className={blocking.length ? 'text-danger' : 'text-success'}>{blocking.length ? `미결정 ${blocking.length}` : '확인 완료'}</strong></div></div>
-      {!!blocking.length && <IssueList title="완료 전 확인이 필요해요" issues={blocking} items={draft.items} onEdit={onEdit} />}
-      {!!warnings.length && <IssueList title="순서를 한번 확인해 주세요" issues={warnings} items={draft.items} onEdit={onEdit} warning />}
       {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다.</div>}
       {draft.basicInfo.globalRequestNote && <div className="global-note"><span>전체 요청사항</span><p>{draft.basicInfo.globalRequestNote}</p></div>}
       <VenueChecklistPreview projection={projection} />
-      <FinalCeremonySheet draft={draft} projection={projection} script={script} />
-      <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>}{!!section.note.length && <div className="inline-note"><strong>주의사항 / 실행 메모</strong>{section.note.join(' · ')}</div>}</div></article>)}</div>
+      <FinalCeremonySheet draft={draft} projection={projection} script={script} issues={allIssues} onNotify={onNotify} />
+      <details className="owner-script-review">
+        <summary>사회자 자동 대본 미리보기</summary>
+        <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <div className="preview-support review-cue"><strong>Cue</strong><ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul></div>}{!!section.note.length && <div className="inline-note"><strong>Note</strong><ul>{section.note.map((note) => <li key={note}>{note}</li>)}</ul></div>}</div></article>)}</div>
+      </details>
     </div>
   );
 }
 
-function IssueList({ title, issues, items, onEdit, warning = false }: { title: string; issues: ReturnType<typeof validateDraft>; items: CeremonyItem[]; onEdit: (issue: ValidationIssue) => void; warning?: boolean }) { return <section className={`issue-list ${warning ? 'warning' : ''}`}><h2>{title}</h2>{issues.map((issue) => { const item = items.find((candidate) => candidate.id === (issue.ceremonyItemId ?? issue.itemId)); const canEdit = !!(issue.field || issue.itemId || issue.ceremonyItemId); return <div key={issue.id}><span>{warning ? '!' : '·'}</span><p>{item && <strong className="issue-item-title">{ceremonyItemDisplayTitle(item)}</strong>}{issue.message}</p>{canEdit && <button type="button" onClick={() => onEdit(issue)}>{warning ? '확인하기' : '입력하기'}</button>}</div>; })}</section>; }
+function IssueSummary({ issues, projectionWarnings, items, onEdit }: { issues: ReturnType<typeof validateDraft>; projectionWarnings: string[]; items: CeremonyItem[]; onEdit: (issue: ValidationIssue) => void }) {
+  const firstEditable = issues.find((issue) => issue.field || issue.itemId || issue.ceremonyItemId);
+  const totalCount = issues.length + projectionWarnings.length;
+  return (
+    <section className="owner-issue-summary" aria-labelledby="owner-issue-summary-title">
+      <div>
+        <span className="section-kicker">확인 필요</span>
+        <h2 id="owner-issue-summary-title">확인이 필요한 항목 {totalCount}개</h2>
+        <div className="owner-issue-items">
+          {issues.slice(0, 5).map((issue) => {
+            const item = items.find((candidate) => candidate.id === (issue.ceremonyItemId ?? issue.itemId));
+            const canEdit = !!(issue.field || issue.itemId || issue.ceremonyItemId);
+            return (
+              <div key={issue.id}>
+                <p>{item && <strong>{ceremonyItemDisplayTitle(item)}</strong>}{issue.message}</p>
+                {canEdit && <button type="button" onClick={() => onEdit(issue)}>입력하기</button>}
+              </div>
+            );
+          })}
+          {projectionWarnings.slice(0, 3).map((warning) => (
+            <div key={warning}>
+              <p>{items.reduce((value, item) => value.replace(` (${item.id})`, ''), warning)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      {firstEditable && <button type="button" className="button primary" onClick={() => onEdit(firstEditable)}>한 번에 확인하기</button>}
+    </section>
+  );
+}
