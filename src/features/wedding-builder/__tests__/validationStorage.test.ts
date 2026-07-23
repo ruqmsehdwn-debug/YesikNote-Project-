@@ -1061,6 +1061,37 @@ describe('validation and storage', () => {
     }));
   });
 
+  it('미진행 안내에서 작성값을 유지한 채 다시 진행할 수 있다', () => {
+    const draft = createDraft();
+    const vow = draft.items.find((item) => item.type === 'vows')!;
+    const inactiveVow = {
+      ...vow,
+      active: false,
+      customIntro: '보관할 직접 소개',
+      participants: [{
+        id: 'saved-reader',
+        role: 'vow_reader',
+        name: '보관된 낭독자',
+      }],
+    };
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, {
+      item: inactiveVow,
+      onChange,
+    }));
+
+    expect(view.getByText('이 식순은 진행하지 않아요')).toBeInTheDocument();
+    expect(view.getByText(/작성한 내용은 보관/)).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: '다시 진행하기' }));
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: inactiveVow.id,
+      active: true,
+      customIntro: '보관할 직접 소개',
+      participants: inactiveVow.participants,
+    }));
+  });
+
   it('한글 받침에 따라 조사를 자연스럽게 선택한다', () => {
     expect(withParticle('서준', ['이', '가'])).toBe('서준이');
     expect(withParticle('하나', ['이', '가'])).toBe('하나가');

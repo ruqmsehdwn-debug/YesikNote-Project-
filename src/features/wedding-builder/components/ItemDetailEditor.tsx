@@ -128,6 +128,15 @@ export function ItemDetailEditor({
           : createCandleChildren(item.id, mode),
     });
   };
+  const reactivateItem = () => update({
+    active: true,
+    detailConfig: item.type === 'candle_lighting' && item.detailConfig.mode === 'omit'
+      ? {
+        ...item.detailConfig,
+        mode: String(item.detailConfig.previousMode ?? 'mothers'),
+      }
+      : item.detailConfig,
+  });
 
   return (
     <section className="detail-editor" ref={editorRef}>
@@ -137,13 +146,19 @@ export function ItemDetailEditor({
           <h2>{item.title}</h2>
         </div>
         <div className="segmented" role="group" aria-label="진행 여부">
-          <button type="button" className={item.active ? 'active' : ''} onClick={() => update({ active: true, detailConfig: item.type === 'candle_lighting' && item.detailConfig.mode === 'omit' ? { ...item.detailConfig, mode: String(item.detailConfig.previousMode ?? 'mothers') } : item.detailConfig })}>진행</button>
+          <button type="button" className={item.active ? 'active' : ''} onClick={reactivateItem}>진행</button>
           <button type="button" className={!item.active ? 'active' : ''} onClick={() => update({ active: false })}>미진행</button>
         </div>
       </div>
 
       {!item.active && (
-        <div className="notice warm">미진행 항목은 최종 대본과 MC 화면에서 제외되며, 현재 입력값은 보존됩니다.</div>
+        <div className="inactive-guidance" role="status">
+          <div>
+            <strong>이 식순은 진행하지 않아요</strong>
+            <p>작성한 내용은 보관되며, 다시 진행으로 바꾸면 그대로 사용할 수 있어요.</p>
+          </div>
+          <button type="button" onClick={reactivateItem}>다시 진행하기</button>
+        </div>
       )}
 
       <div className="form-grid two">

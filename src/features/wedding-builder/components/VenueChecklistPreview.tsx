@@ -2,6 +2,7 @@ import type {
   CeremonyProjection,
   CeremonyProjectionSummary,
 } from '../services/ceremonyProjection';
+import { StatusBadge } from './StatusBadge';
 
 type Props = {
   projection: CeremonyProjection;
@@ -28,32 +29,135 @@ function displayWarning(value: string) {
 
 export function VenueChecklistPreview({ projection, onNavigate }: Props) {
   const rows = [
-    ['예식 형태', projection.ceremonyType.status === 'known'
-      ? projection.ceremonyType.label
-      : '확인 필요', undefined],
+    {
+      label: '예식 형태',
+      value: projection.ceremonyType.status === 'known'
+        ? projection.ceremonyType.label
+        : '확인 필요',
+      sourceId: undefined,
+    },
     ...(projection.officiantType === 'officiant'
-      ? [[
-        '주례 정보',
-        summaryValue(projection.officiant),
-        projection.officiant.sourceId ?? undefined,
-      ] as const]
+      ? [{
+        label: '주례 정보',
+        value: summaryValue(projection.officiant),
+        sourceId: projection.officiant.sourceId ?? undefined,
+        status: projection.officiant.active ? undefined : 'inactive' as const,
+      }]
       : []),
-    ['화촉점화', summaryValue(projection.candleLighting), projection.candleLighting.sourceId ?? undefined],
-    ['신랑 입장', summaryValue(projection.entrance.groom), projection.entrance.groom.sourceId ?? undefined],
-    ['신부 입장 및 동반자', summaryValue(projection.entrance.bride), projection.entrance.bride.sourceId ?? undefined],
-    ['혼인서약', summaryValue(projection.vow), projection.vow.sourceId ?? undefined],
-    ['성혼선언', summaryValue(projection.declaration), projection.declaration.sourceId ?? undefined],
-    ['덕담', speechValue(projection.blessingOrSpeech, '덕담'), projection.blessingOrSpeech.sourceId ?? undefined],
-    ['축사', speechValue(projection.blessingOrSpeech, '축사'), projection.blessingOrSpeech.sourceId ?? undefined],
-    ['축가·축무', summaryValue(projection.performance), projection.performance.sourceId ?? undefined],
-    ['예물교환', summaryValue(projection.giftExchange), projection.giftExchange.sourceId ?? undefined],
-    ['양가 부모님 및 내빈께 인사', summaryValue(projection.familyGreeting), projection.familyGreeting.sourceId ?? undefined],
-    ['행진', summaryValue(projection.procession), projection.procession.sourceId ?? undefined],
-    ['자료 준비 상태', '확인 필요', undefined],
-    ['음원 재생 타이밍', '확인 필요', projection.procession.sourceId ?? undefined],
-  ] as const;
+    {
+      label: '화촉점화',
+      value: summaryValue(projection.candleLighting),
+      sourceId: projection.candleLighting.sourceId ?? undefined,
+      status: !projection.candleLighting.active && projection.candleLighting.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '신랑 입장',
+      value: summaryValue(projection.entrance.groom),
+      sourceId: projection.entrance.groom.sourceId ?? undefined,
+      status: !projection.entrance.groom.active && projection.entrance.groom.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '신부 입장 및 동반자',
+      value: summaryValue(projection.entrance.bride),
+      sourceId: projection.entrance.bride.sourceId ?? undefined,
+      status: !projection.entrance.bride.active && projection.entrance.bride.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '혼인서약',
+      value: summaryValue(projection.vow),
+      sourceId: projection.vow.sourceId ?? undefined,
+      roleLabel: projection.vow.active && projection.vow.participant ? '낭독자' : undefined,
+      roleValue: projection.vow.active ? projection.vow.participant : undefined,
+      status: !projection.vow.active && projection.vow.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '성혼선언',
+      value: summaryValue(projection.declaration),
+      sourceId: projection.declaration.sourceId ?? undefined,
+      roleLabel: projection.declaration.active && projection.declaration.participant ? '진행자' : undefined,
+      roleValue: projection.declaration.active ? projection.declaration.participant : undefined,
+      status: !projection.declaration.active && projection.declaration.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '덕담',
+      value: speechValue(projection.blessingOrSpeech, '덕담'),
+      sourceId: projection.blessingOrSpeech.sourceId ?? undefined,
+      roleLabel: projection.blessingOrSpeech.active
+        && projection.blessingOrSpeech.summary.startsWith('덕담')
+        && projection.blessingOrSpeech.participant
+        ? '덕담자'
+        : undefined,
+      roleValue: projection.blessingOrSpeech.summary.startsWith('덕담')
+        ? projection.blessingOrSpeech.participant
+        : undefined,
+    },
+    {
+      label: '축사',
+      value: speechValue(projection.blessingOrSpeech, '축사'),
+      sourceId: projection.blessingOrSpeech.sourceId ?? undefined,
+      roleLabel: projection.blessingOrSpeech.active
+        && projection.blessingOrSpeech.summary.startsWith('축사')
+        && projection.blessingOrSpeech.participant
+        ? '축사자'
+        : undefined,
+      roleValue: projection.blessingOrSpeech.summary.startsWith('축사')
+        ? projection.blessingOrSpeech.participant
+        : undefined,
+    },
+    {
+      label: '축가·축무',
+      value: summaryValue(projection.performance),
+      sourceId: projection.performance.sourceId ?? undefined,
+      status: !projection.performance.active && projection.performance.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+      performanceItems: projection.performance.active
+        ? projection.performance.items
+        : undefined,
+    },
+    {
+      label: '예물교환',
+      value: summaryValue(projection.giftExchange),
+      sourceId: projection.giftExchange.sourceId ?? undefined,
+      status: !projection.giftExchange.active && projection.giftExchange.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '양가 부모님 및 내빈께 인사',
+      value: summaryValue(projection.familyGreeting),
+      sourceId: projection.familyGreeting.sourceId ?? undefined,
+      status: !projection.familyGreeting.active && projection.familyGreeting.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    {
+      label: '행진',
+      value: summaryValue(projection.procession),
+      sourceId: projection.procession.sourceId ?? undefined,
+      status: !projection.procession.active && projection.procession.status === 'known'
+        ? 'inactive' as const
+        : undefined,
+    },
+    { label: '자료 준비 상태', value: '확인 필요', sourceId: undefined },
+    {
+      label: '음원 재생 타이밍',
+      value: '확인 필요',
+      sourceId: projection.procession.sourceId ?? undefined,
+    },
+  ];
   const projectionSourceIds = rows
-    .map(([, , sourceId]) => sourceId)
+    .map(({ sourceId }) => sourceId)
     .filter((sourceId): sourceId is string => !!sourceId);
   const warningSourceId = (warning: string) => {
     const direct = projectionSourceIds
@@ -90,13 +194,48 @@ export function VenueChecklistPreview({ projection, onNavigate }: Props) {
       <details className="venue-checklist-details">
         <summary>예식장 확인용 전체 요약 보기</summary>
         <dl className="venue-checklist-grid">
-          {rows.map(([label, value, sourceId]) => (
-            <div className="venue-checklist-row" key={label}>
-              <dt>{label}</dt>
-              <dd className={value === '확인 필요' ? 'needs-confirmation' : ''}>
-                {value === '확인 필요' && onNavigate
-                  ? <button type="button" onClick={() => onNavigate(sourceId, `${label} 확인 필요`)}>{value}</button>
-                  : value}
+          {rows.map((row) => (
+            <div className="venue-checklist-row" key={row.label}>
+              <dt>{row.label}</dt>
+              <dd className={row.value === '확인 필요' ? 'needs-confirmation' : ''}>
+                {row.status === 'inactive' ? (
+                  <StatusBadge tone="inactive">미진행</StatusBadge>
+                ) : row.value === '확인 필요' ? (
+                  onNavigate
+                    ? (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate(row.sourceId, `${row.label} 확인 필요`)}
+                      >
+                        <StatusBadge tone="needs-review">확인 필요</StatusBadge>
+                      </button>
+                    )
+                    : <StatusBadge tone="needs-review">확인 필요</StatusBadge>
+                ) : row.performanceItems?.length ? (
+                  <span className="checklist-performance">
+                    <strong>축가 {row.performanceItems.length}곡</strong>
+                    {row.performanceItems.map((performance) => (
+                      <span key={performance.sourceId}>
+                        <small>
+                          {performance.type === 'song'
+                            ? '축가자'
+                            : performance.type === 'dance'
+                              ? '공연자'
+                              : '연주자'}
+                        </small>
+                        <b>{performance.performerName || '확인 필요'}</b>
+                        {performance.title && <em>{performance.title}</em>}
+                      </span>
+                    ))}
+                  </span>
+                ) : row.roleLabel && row.roleValue ? (
+                  <span className="checklist-role">
+                    <small>{row.roleLabel}</small>
+                    <strong>{row.roleValue}</strong>
+                  </span>
+                ) : (
+                  row.value
+                )}
               </dd>
             </div>
           ))}
