@@ -18,11 +18,13 @@ export type CeremonyReviewDetail = {
 export type CeremonyReviewRow = {
   sourceId: string;
   title: string;
+  active: boolean;
   summary: string;
   details: CeremonyReviewDetail[];
   cues: string[];
   notes: string[];
-  warnings: string[];
+  userActions: string[];
+  fieldConfirmations: string[];
 };
 
 const performanceTypeLabels: Record<
@@ -37,6 +39,8 @@ const performanceTypeLabels: Record<
 function displayText(value?: string) {
   return value
     ?.trim()
+    .replace(/(신랑|신부)(?:의|님의)\s*고등학교\s*친구/g, '$1 고등학교 동창')
+    .replace(/(신랑|신부)(?:의|님의)\s*중학교\s*친구/g, '$1 중학교 동창')
     .replace(/님의(?=[가-힣])/g, '님의 ')
     .replace(/고등학교친구/g, '고등학교 친구')
     .replace(/중학교친구/g, '중학교 친구')
@@ -70,6 +74,27 @@ function scriptValues(
     )));
 }
 
+export function displayCues(
+  item: CeremonyItem,
+  values: string[],
+) {
+  const unique = values.filter((value, index) => values.indexOf(value) === index);
+  if (item.cueOverride?.length) return unique;
+  if (item.type === 'groom_entrance') {
+    return ['입장곡 준비', '입장곡 시작 → 신랑 입장'];
+  }
+  if (item.type === 'bride_entrance') {
+    return ['신부·동반자 대기', '입장곡 시작 → 신부 입장'];
+  }
+  if (item.type === 'recessional') {
+    return ['행진곡 준비', '행진곡 시작 → 신랑·신부 출발'];
+  }
+  if (item.type === 'candle_lighting') {
+    return ['양가 어머님 입장', '점화 → 맞절 → 내빈 인사 → 착석'];
+  }
+  return unique.slice(0, 2);
+}
+
 function validationWarnings(
   item: CeremonyItem,
   issues: ValidationIssue[],
@@ -77,6 +102,7 @@ function validationWarnings(
   return issues
     .filter((issue) => (
       (issue.ceremonyItemId ?? issue.itemId) === item.id
+      && issue.severity === 'blocking'
     ))
     .map((issue) => issue.message);
 }
@@ -89,10 +115,10 @@ function checklistSummary(
     .find((candidate) => candidate.sourceId === item.id);
   if (!projected || projected.summary.includes('UNKNOWN')) return '확인 필요';
   return projected.summary
-    .replace(/^진행 · 낭독:\s*/, '')
-    .replace(/^진행 · 주체:\s*/, '')
-    .replace(/^덕담 · 주체:\s*/, '')
-    .replace(/^축사 · 주체:\s*/, '');
+    .replace(/^낭독자:\s*/, '')
+    .replace(/^진행자:\s*/, '')
+    .replace(/^덕담자:\s*/, '')
+    .replace(/^축사자:\s*/, '');
 }
 
 function entranceDetails(item: CeremonyItem): CeremonyReviewDetail[] {
@@ -136,20 +162,45 @@ function entranceDetails(item: CeremonyItem): CeremonyReviewDetail[] {
 function performanceDetails(
   projection: PerformanceProjection,
 ): CeremonyReviewDetail[] {
+  if (projection.items.length === 1) {
+    const performance = projection.items[0];
+    const participantLabel = performance.type === 'song'
+      ? '축가자'
+      : performance.type === 'dance'
+        ? '공연자'
+        : '연주자';
+    return [
+      { label: '공연 종류', value: performanceTypeLabels[performance.type] },
+      ...(displayText(performance.title)
+        ? [{ label: '곡명', value: displayText(performance.title)! }]
+        : []),
+      ...(displayText(performance.performerName)
+        ? [{ label: participantLabel, value: displayText(performance.performerName)! }]
+        : []),
+      ...(displayText(performance.performerRelation)
+        ? [{ label: '관계', value: displayText(performance.performerRelation)! }]
+        : []),
+    ];
+  }
   return [
     { label: '공연', value: `${projection.items.length}건` },
     ...projection.items.flatMap((performance, index) => {
       const number = index + 1;
+      const participantLabel = performance.type === 'song'
+        ? '축가자'
+        : performance.type === 'dance'
+          ? '공연자'
+          : '연주자';
       return [
-        { label: `${number}번 종류`, value: performanceTypeLabels[performance.type] },
+        { label: `공연 ${number} 종류`, value: performanceTypeLabels[performance.type] },
         ...(displayText(performance.title)
-          ? [{ label: `${number}번 곡명·공연명`, value: displayText(performance.title)! }]
+          ? [{ label: `공연 ${number} 곡명·공연명`, value: displayText(performance.title)! }]
           : []),
         ...(displayText(performance.performerName)
-          ? [{ label: `${number}번 진행자`, value: displayText(performance.performerName)! }]
+          ? [{ label: `공연 ${number} ${participantLabel}`, value: displayText(performance.performerName)! }]
           : []),
         ...(displayText(performance.performerRelation)
-          ? [{ label: `${number}번 관계`, value: displayText(performance.performerRelation)! }]
+          ? [{ label: `공연 ${number} 관계`, value: displayText(performance.performerRelation)! }]
           : []),
       ];
     }),
@@ -223,6 +274,7 @@ function rowSummary(
   item: CeremonyItem,
   projection: CeremonyProjection,
 ) {
+  if (!item.active) return '미진행';
   if (item.type === 'candle_lighting') {
     return projection.candleLighting.summary.split(' · ')[0];
   }
@@ -238,9 +290,14 @@ function rowSummary(
   if (item.type === 'performance') {
     const first = projection.performance.items[0];
     const performer = displayText(first?.performerName);
+    const songCount = projection.performance.items
+      .filter((performance) => performance.type === 'song').length;
+    const countLabel = songCount === projection.performance.items.length
+      ? `${songCount}곡`
+      : `공연 ${projection.performance.items.length}건`;
     return [
-      `공연 ${projection.performance.items.length}건`,
       performer,
+      countLabel,
     ].filter(Boolean).join(' · ');
   }
   if (item.type === 'vows') {
@@ -269,25 +326,35 @@ export function buildCeremonyReviewRows(
   issues: ValidationIssue[] = [],
 ): CeremonyReviewRow[] {
   return [...draft.items]
-    .filter((item) => item.active)
+    .filter((item) => item.active || item.type === 'ring_exchange')
     .sort((a, b) => a.order - b.order)
     .map((item) => {
       const summary = rowSummary(item, projection);
-      const warnings = [
+      const userActions = item.active ? [
         ...validationWarnings(item, issues),
-        ...projection.sourceWarnings
-          .filter((warning) => projectionWarningForItem(warning, item))
-          .map((warning) => cleanWarning(warning, item)),
-        ...(summary.includes('확인 필요') ? ['진행 정보를 확인해 주세요.'] : []),
-      ].filter((value, index, values) => values.indexOf(value) === index);
+      ].filter((value, index, values) => values.indexOf(value) === index) : [];
+      const projectionConfirmations = projection.sourceWarnings
+        .filter((warning) => projectionWarningForItem(warning, item))
+        .map((warning) => cleanWarning(warning, item));
+      const fieldConfirmations = item.active && !userActions.length ? [
+        ...projectionConfirmations,
+        ...(summary.includes('확인 필요')
+          && !userActions.length
+          && !projectionConfirmations.length
+          ? ['진행 정보를 예식장과 확인해 주세요.']
+          : []),
+      ].filter((value, index, values) => values.indexOf(value) === index) : [];
+      const rawCues = scriptValues(item, script, 'cue');
       return {
         sourceId: item.id,
         title: ceremonyItemDisplayTitle(item),
+        active: item.active,
         summary,
         details: itemDetails(item, projection),
-        cues: scriptValues(item, script, 'cue'),
+        cues: item.active ? displayCues(item, rawCues) : [],
         notes: scriptValues(item, script, 'note'),
-        warnings,
+        userActions,
+        fieldConfirmations,
       };
     });
 }

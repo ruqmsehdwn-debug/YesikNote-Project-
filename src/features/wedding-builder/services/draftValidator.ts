@@ -99,6 +99,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
         issues.push({
           id: `${item.id}-${person.id}-name`,
           itemId: item.id,
+          field: 'participantName',
           severity: 'blocking',
           message: `${ceremonyItemDisplayTitle(item)} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
         });
@@ -107,6 +108,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
         issues.push({
           id: `${item.id}-${person.id}-intro`,
           itemId: item.id,
+          field: 'participantName',
           severity: 'blocking',
           message: '소개 멘트를 입력해 주세요.',
         });
@@ -120,6 +122,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
       issues.push({
         id: `${item.id}-required-person`,
         itemId: item.id,
+        field: 'participantName',
         severity: 'blocking',
         message: `${ceremonyItemDisplayTitle(item)} 소개 대상의 이름 또는 호칭을 입력해 주세요.`,
       });
@@ -133,6 +136,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
       issues.push({
         id: `${item.id}-required-speaker`,
         itemId: item.id,
+        field: 'participantName',
         severity: 'blocking',
         message: '성혼선언자의 이름 또는 호칭을 입력해 주세요.',
       });
@@ -147,6 +151,7 @@ export function validateDraft(draft: CeremonyDraft): ValidationIssue[] {
       issues.push({
         id: `${item.id}-flower-child`,
         itemId: item.id,
+        field: 'flowerChildName',
         severity: 'blocking',
         message: '화동의 이름 또는 표시 호칭을 입력해 주세요.',
       });

@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe('MC Projection 동기화', () => {
-  it('직접 수정 대본을 보존하고 Cue·Note·확인 필요를 서로 다른 영역에 표시한다', () => {
+  it('직접 수정 대본과 Cue·Note를 보존하고 내부 정책 경고는 MC에 표시하지 않는다', () => {
     const draft = createDraft();
     const declaration = draft.items.find((item) => item.type === 'pronouncement')!;
     declaration.narrationOverride = '사용자가 직접 수정한 성혼선언 대본';
@@ -36,7 +36,7 @@ describe('MC Projection 동기화', () => {
     const note = view.getByRole('heading', { name: '주의사항 / 실행 메모' }).closest('section')!;
     expect(within(cue).getByText('성혼선언자 마이크 준비')).toBeInTheDocument();
     expect(within(note).getByText('성혼선언자 위치 확인')).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: '현재 식순 확인 필요' })).toBeInTheDocument();
-    expect(view.getByText(/직접 수정 대본 확인 필요/)).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: '현재 식순 확인 필요' })).not.toBeInTheDocument();
+    expect(view.queryByText(/직접 수정 대본 확인 필요/)).not.toBeInTheDocument();
   });
 });

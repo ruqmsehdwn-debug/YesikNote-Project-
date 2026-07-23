@@ -10,7 +10,10 @@ import type {
   CeremonyProjection,
   PerformanceProjection,
 } from '../services/ceremonyProjection';
-import { buildCeremonyReviewRows } from '../services/ceremonyReview';
+import {
+  buildCeremonyReviewRows,
+  displayCues,
+} from '../services/ceremonyReview';
 
 type Props = {
   draft: CeremonyDraft;
@@ -18,6 +21,7 @@ type Props = {
   script: ScriptPackage;
   issues?: ValidationIssue[];
   onNotify?: (message: string) => void;
+  onEdit?: (issue: ValidationIssue) => void;
 };
 
 const performanceTypeLabels: Record<
@@ -85,23 +89,14 @@ function cleanAllSourceIds(
   );
 }
 
-function warningsForItem(
-  item: CeremonyItem,
-  projection: CeremonyProjection,
-) {
-  return projection.sourceWarnings
-    .filter((warning) => (
-      warning.includes(`(${item.id})`)
-      || warning.includes(item.title)
-      || warning.includes(ceremonyItemDisplayTitle(item))
-    ))
-    .map((warning) => cleanWarning(warning, item.id));
-}
-
 function performanceSummary(performance: PerformanceProjection) {
   if (!performance.items.length) return '확인 필요';
+  const songCount = performance.items
+    .filter((item) => item.type === 'song').length;
   return [
-    `공연 카드 ${performance.items.length}건`,
+    songCount === performance.items.length
+      ? `축가 ${songCount}곡`
+      : `공연 ${performance.items.length}건`,
     ...performance.items.map((item, index) => {
       const performer = [
         item.performerName.trim(),
@@ -110,8 +105,8 @@ function performanceSummary(performance: PerformanceProjection) {
       const detail = [
         item.title?.trim(),
         performer,
-      ].filter(Boolean).join(' / ');
-      return `${index + 1}. ${performanceTypeLabels[item.type]}${detail ? ` — ${detail}` : ''}`;
+      ].filter(Boolean).join('\n');
+      return `${index + 1}. ${performanceTypeLabels[item.type]}${detail ? `\n${detail}` : ''}`;
     }),
   ].join('\n');
 }
@@ -175,12 +170,16 @@ export function FinalCeremonySheet({
   script,
   issues = [],
   onNotify,
+  onEdit,
 }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [showFullTable, setShowFullTable] = useState(false);
   const orderedItems = [...draft.items].sort((a, b) => a.order - b.order);
   const activeItems = orderedItems.filter((item) => item.active);
   const inactiveItems = orderedItems.filter((item) => !item.active);
+  const tableItems = orderedItems.filter(
+    (item) => item.active || item.type === 'ring_exchange',
+  );
   const reviewRows = useMemo(
     () => buildCeremonyReviewRows(draft, projection, script, issues),
     [draft, projection, script, issues],
@@ -199,6 +198,20 @@ export function FinalCeremonySheet({
     setShowFullTable(true);
     onNotify?.('인쇄 준비 완료');
     window.setTimeout(() => window.print(), 0);
+  };
+
+  const editRow = (sourceId: string) => {
+    const issue = issues.find(
+      (candidate) => (
+        candidate.severity === 'blocking'
+        && (candidate.ceremonyItemId ?? candidate.itemId) === sourceId
+      ),
+    );
+    if (issue && onEdit) {
+      onEdit(issue);
+      return;
+    }
+    setExpandedIds((previous) => new Set(previous).add(sourceId));
   };
 
   return (
@@ -238,31 +251,66 @@ export function FinalCeremonySheet({
       <ol className="final-review-list" aria-label="최종 식순 간단 목록">
         {reviewRows.map((row, index) => {
           const expanded = expandedIds.has(row.sourceId);
+          const needsUserAction = row.userActions.length > 0;
+          const needsFieldConfirmation = row.fieldConfirmations.length > 0;
           return (
             <li
               key={row.sourceId}
-              className={`final-review-item ${row.warnings.length ? 'needs-review' : ''}`}
+              className={[
+                'final-review-item',
+                needsUserAction ? 'needs-review' : '',
+                needsFieldConfirmation ? 'needs-field-confirmation' : '',
+                !row.active ? 'inactive' : '',
+              ].filter(Boolean).join(' ')}
               data-source-id={row.sourceId}
             >
-              <button
-                type="button"
-                className="final-review-toggle"
-                aria-expanded={expanded}
-                aria-controls={`final-review-detail-${row.sourceId}`}
-                onClick={() => toggleExpanded(row.sourceId)}
-              >
-                <span className="final-review-number">{index + 1}</span>
-                <span className="final-review-copy">
-                  <strong>{row.title}</strong>
-                  <small>{row.summary}</small>
-                </span>
-                <span className={`review-status-badge ${row.warnings.length ? 'warning' : 'complete'}`}>
-                  {row.warnings.length ? `확인 필요 ${row.warnings.length}` : '확인 완료'}
-                </span>
-                <span className="final-review-action">
-                  {expanded ? '접기' : '자세히 보기'}
-                </span>
-              </button>
+              <div className="final-review-main">
+                <button
+                  type="button"
+                  className="final-review-toggle"
+                  aria-expanded={expanded}
+                  aria-controls={`final-review-detail-${row.sourceId}`}
+                  onClick={() => toggleExpanded(row.sourceId)}
+                >
+                  <span className="final-review-number">{index + 1}</span>
+                  <span className="final-review-copy">
+                    <strong>{row.title}</strong>
+                    <small>{row.summary}</small>
+                    {!!(row.cues.length + row.notes.length) && (
+                      <small className="final-review-support-count">
+                        현장 메모 {row.cues.length + row.notes.length}개
+                      </small>
+                    )}
+                  </span>
+                </button>
+                {!row.active ? (
+                  <span className="review-status-badge inactive">미진행</span>
+                ) : needsUserAction ? (
+                  <button
+                    type="button"
+                    className="review-status-badge action"
+                    onClick={() => editRow(row.sourceId)}
+                  >
+                    수정 필요 {row.userActions.length}
+                  </button>
+                ) : needsFieldConfirmation ? (
+                  <span className="review-status-badge field">
+                    현장 확인 {row.fieldConfirmations.length}
+                  </span>
+                ) : (
+                  <span className="review-status-badge complete">확인 완료</span>
+                )}
+                <button
+                  type="button"
+                  className={`final-review-action ${needsUserAction ? 'fix' : ''}`}
+                  aria-expanded={needsUserAction ? undefined : expanded}
+                  onClick={() => needsUserAction
+                    ? editRow(row.sourceId)
+                    : toggleExpanded(row.sourceId)}
+                >
+                  {needsUserAction ? '바로 수정' : expanded ? '접기' : '자세히 보기'}
+                </button>
+              </div>
               {expanded && (
                 <div
                   id={`final-review-detail-${row.sourceId}`}
@@ -290,10 +338,22 @@ export function FinalCeremonySheet({
                         : <p>별도 Note가 없습니다.</p>}
                     </section>
                   </div>
-                  {!!row.warnings.length && (
-                    <section className="review-row-warnings" aria-label={`${row.title} 확인 필요`}>
-                      <h3>확인 필요</h3>
-                      <ul>{row.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                  {!!row.userActions.length && (
+                    <section className="review-row-warnings user-action" aria-label={`${row.title} 수정 필요`}>
+                      <h3>수정 필요</h3>
+                      <ul>{row.userActions.map((warning) => (
+                        <li key={warning}>
+                          <button type="button" onClick={() => editRow(row.sourceId)}>{warning}</button>
+                        </li>
+                      ))}</ul>
+                    </section>
+                  )}
+                  {!!row.fieldConfirmations.length && (
+                    <section className="review-row-warnings field-confirmation" aria-label={`${row.title} 현장 확인`}>
+                      <h3>현장 확인</h3>
+                      <ul>{row.fieldConfirmations.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}</ul>
                     </section>
                   )}
                 </div>
@@ -329,16 +389,25 @@ export function FinalCeremonySheet({
                 </tr>
               </thead>
               <tbody>
-                {activeItems.map((item, index) => {
-                  const cues = supportValues(item, script, 'cue');
-                  const notes = supportValues(item, script, 'note');
-                  const warnings = warningsForItem(item, projection);
+                {tableItems.map((item) => {
+                  const index = activeItems.findIndex((candidate) => candidate.id === item.id);
+                  const rawCues = supportValues(item, script, 'cue');
+                  const cues = item.active
+                    ? displayCues(item, rawCues.map((cue) => cue.value))
+                      .map((value) => ({ id: `${item.id}-display-cue-${value}`, value }))
+                    : [];
+                  const notes = item.active ? supportValues(item, script, 'note') : [];
+                  const reviewRow = reviewRows.find((row) => row.sourceId === item.id);
+                  const warnings = [
+                    ...(reviewRow?.userActions ?? []),
+                    ...(reviewRow?.fieldConfirmations ?? []),
+                  ];
                   return (
                     <tr key={item.id} data-source-id={item.id}>
-                      <td data-label="순번">{index + 1}</td>
+                      <td data-label="순번">{item.active ? index + 1 : '—'}</td>
                       <th scope="row" data-label="식순">{ceremonyItemDisplayTitle(item)}</th>
                       <td data-label="진행 정보" className="sheet-summary">
-                        {tableSummary(item, projection)}
+                        {item.active ? tableSummary(item, projection) : '미진행'}
                       </td>
                       <td data-label="Cue"><SupportList values={cues} /></td>
                       <td data-label="Note"><SupportList values={notes} /></td>
@@ -369,7 +438,7 @@ export function FinalCeremonySheet({
           )}
 
           <section className="final-sheet-confirmations" aria-labelledby="final-sheet-confirmations-title">
-            <h3 id="final-sheet-confirmations-title">공동 확인 필요사항</h3>
+            <h3 id="final-sheet-confirmations-title">예식장과 확인할 항목</h3>
             {projection.sourceWarnings.length ? (
               <ul>
                 {projection.sourceWarnings.map((warning) => (

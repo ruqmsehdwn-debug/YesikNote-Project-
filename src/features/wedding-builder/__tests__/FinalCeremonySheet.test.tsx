@@ -59,11 +59,11 @@ describe('FinalCeremonySheet', () => {
     const vowRow = view.getByText('혼인서약', { selector: 'th' }).closest('tr')!;
     const declarationRow = view.getByText('성혼선언', { selector: 'th' }).closest('tr')!;
 
-    expect(within(vowRow).getByText(/낭독: 신랑·신부/)).toBeInTheDocument();
-    expect(within(declarationRow).getByText(/주체: 신랑 어머님/)).toBeInTheDocument();
+    expect(within(vowRow).getByText(/낭독자: 신랑·신부/)).toBeInTheDocument();
+    expect(within(declarationRow).getByText(/진행자: 신랑 어머님/)).toBeInTheDocument();
   });
 
-  it('공연 카드 2건을 곡 수로 확정하지 않고 입력 순서대로 표시한다', () => {
+  it('축가 카드 2개를 축가 2곡으로 입력 순서대로 표시한다', () => {
     const draft = createDraft();
     const performance = draft.items.find((item) => item.type === 'performance')!;
     performance.detailConfig.performances = [
@@ -90,11 +90,10 @@ describe('FinalCeremonySheet', () => {
     const view = renderSheet(draft);
     openFullTable(view);
     const row = view.getByText('축가', { selector: 'th' }).closest('tr')!;
-    const summary = within(row).getByText(/공연 카드 2건/);
+    const summary = within(row).getByText(/축가 2곡/);
 
-    expect(summary).toHaveTextContent('1. 축가 — 첫 번째 공연 / 공연자 1 · 친구');
-    expect(summary).toHaveTextContent('2. 축가 — 두 번째 공연 / 공연자 2 · 가족');
-    expect(summary).not.toHaveTextContent('2곡');
+    expect(summary).toHaveTextContent(/1\. 축가\s+첫 번째 공연\s+공연자 1 · 친구/);
+    expect(summary).toHaveTextContent(/2\. 축가\s+두 번째 공연\s+공연자 2 · 가족/);
   });
 
   it('Cue와 Note를 서로 다른 열에 표시한다', () => {
@@ -138,6 +137,21 @@ describe('FinalCeremonySheet', () => {
     expect(draft).toEqual(original);
   });
 
+  it('예물교환 미진행을 전체 표에 한 줄로 표시하고 Cue·Note는 숨긴다', () => {
+    const draft = createDraft();
+    const giftExchange = draft.items.find((item) => item.type === 'ring_exchange')!;
+    giftExchange.active = false;
+    giftExchange.cueOverride = ['보존할 Cue'];
+    giftExchange.requestNote = '보존할 Note';
+    const view = renderSheet(draft);
+
+    openFullTable(view);
+    const row = view.getByText('예물교환', { selector: 'th' }).closest('tr')!;
+    expect(within(row).getByText('미진행')).toBeInTheDocument();
+    expect(within(row).queryByText('보존할 Cue')).not.toBeInTheDocument();
+    expect(within(row).queryByText('보존할 Note')).not.toBeInTheDocument();
+  });
+
   it('localStorage를 호출하지 않고 인쇄 버튼만 window.print를 실행한다', () => {
     vi.useFakeTimers();
     const getItem = vi.spyOn(Storage.prototype, 'getItem');
@@ -171,7 +185,7 @@ describe('FinalCeremonySheet', () => {
     const view = renderSheet(draft);
     const item = view.container.querySelector(`[data-source-id="${groomEntrance.id}"]`) as HTMLElement;
 
-    fireEvent.click(within(item).getByRole('button'));
+    fireEvent.click(within(item).getByRole('button', { name: /신랑 입장/ }));
 
     expect(within(item).getByRole('heading', { name: 'Cue' })).toBeInTheDocument();
     expect(within(item).getByText('신랑 입장곡 재생')).toBeInTheDocument();

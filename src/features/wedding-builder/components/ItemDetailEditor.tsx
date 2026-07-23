@@ -12,6 +12,8 @@ type Props = {
   onChange: (item: CeremonyItem) => void;
   pronouncementParticipant?: PersonRef;
   performanceFocusTarget?: PerformanceFocusTarget;
+  itemFocusTarget?: ItemFocusTarget;
+  onPerformanceCreated?: (performanceId: string) => void;
 };
 
 export type PerformanceFocusTarget = {
@@ -21,13 +23,28 @@ export type PerformanceFocusTarget = {
   requestId: number;
 };
 
+export type ItemFocusTarget = {
+  field?: string;
+  policyOnly?: boolean;
+  requestId: number;
+};
+
 const inputClass = 'field-input';
 
 function createPerson(role: string): PersonRef {
   return { id: createId('person'), role, name: '', introMode: 'default', introText: '' };
 }
 
-export function ItemDetailEditor({ item, onChange, pronouncementParticipant, performanceFocusTarget }: Props) {
+export function ItemDetailEditor({
+  item,
+  onChange,
+  pronouncementParticipant,
+  performanceFocusTarget,
+  itemFocusTarget,
+  onPerformanceCreated,
+}: Props) {
+  const editorRef = useRef<HTMLElement>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const update = (patch: Partial<CeremonyItem>) => onChange({ ...item, ...patch });
   const updateConfig = (patch: Record<string, unknown>) =>
     update({ detailConfig: { ...item.detailConfig, ...patch } });
@@ -39,6 +56,29 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
     || pronouncementParticipant?.name.trim()
     || pronouncementParticipant?.relation?.trim()
   );
+
+  useEffect(() => {
+    if (!itemFocusTarget || !editorRef.current) return;
+    const field = !itemFocusTarget.policyOnly && itemFocusTarget.field
+      ? editorRef.current.querySelector<HTMLElement>(
+        `[data-item-field="${itemFocusTarget.field}"]`,
+      )
+      : undefined;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const target = field ?? editorRef.current;
+    target.scrollIntoView?.({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+    field?.focus({ preventScroll: true });
+    editorRef.current.classList.add('detail-editor-target');
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(
+      () => editorRef.current?.classList.remove('detail-editor-target'),
+      2000,
+    );
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      editorRef.current?.classList.remove('detail-editor-target');
+    };
+  }, [itemFocusTarget]);
 
   const updateParticipant = (patch: Partial<PersonRef>, role = 'speaker') => {
     const current = participant ?? createPerson(role);
@@ -90,7 +130,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
   };
 
   return (
-    <section className="detail-editor">
+    <section className="detail-editor" ref={editorRef}>
       <div className="detail-header">
         <div>
           <span className="section-kicker">항목 상세 설정</span>
@@ -109,7 +149,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
       <div className="form-grid two">
         <label>
           식순 이름
-          <input className={inputClass} value={item.title} onChange={(event) => update({ title: event.target.value })} />
+          <input data-item-field="title" className={inputClass} value={item.title} onChange={(event) => update({ title: event.target.value })} />
         </label>
         <label>
           예상 시간(초)
@@ -237,7 +277,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
           <label className="switch-row"><input type="checkbox" checked={!!item.detailConfig.flowerChildEnabled} onChange={(e) => updateConfig({ flowerChildEnabled: e.target.checked, flowerChild: item.detailConfig.flowerChild ?? createPerson('flower_child') })} />화동 있음</label>
           {item.detailConfig.flowerChildEnabled && (
             <div className="form-grid two">
-              <label>이름 또는 표시 호칭<input className={inputClass} value={item.detailConfig.flowerChild?.name ?? ''} onChange={(e) => updateConfig({ flowerChild: { ...(item.detailConfig.flowerChild ?? createPerson('flower_child')), name: e.target.value } })} /></label>
+              <label>이름 또는 표시 호칭<input data-item-field="flowerChildName" className={inputClass} value={item.detailConfig.flowerChild?.name ?? ''} onChange={(e) => updateConfig({ flowerChild: { ...(item.detailConfig.flowerChild ?? createPerson('flower_child')), name: e.target.value } })} /></label>
               <label>신랑·신부와의 관계<input className={inputClass} value={item.detailConfig.flowerChild?.relation ?? ''} onChange={(e) => updateConfig({ flowerChild: { ...(item.detailConfig.flowerChild ?? createPerson('flower_child')), relation: e.target.value } })} /></label>
               <label className="full">화동 소개 멘트<input className={inputClass} value={item.detailConfig.flowerChild?.introText ?? ''} onChange={(e) => updateConfig({ flowerChild: { ...(item.detailConfig.flowerChild ?? createPerson('flower_child')), introText: e.target.value } })} /></label>
               <label>이동 동선<input className={inputClass} value={item.detailConfig.flowerChildRoute ?? ''} onChange={(e) => updateConfig({ flowerChildRoute: e.target.value })} /></label>
@@ -252,7 +292,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
           <label>성혼선언 진행 방식<select className={inputClass} value={item.detailConfig.speakerMode ?? 'mc'} onChange={(e) => updateConfig({ speakerMode: e.target.value })}><option value="mc">사회자 대독</option><option value="groom_father">신랑 아버님</option><option value="bride_father">신부 아버님</option><option value="groom_mother">신랑 어머님</option><option value="bride_mother">신부 어머님</option><option value="family_representative">양가 부모님 대표</option><option value="officiant">주례 선생님</option><option value="custom">직접 입력</option></select></label>
           {item.detailConfig.speakerMode !== 'mc' && (
             <>
-              <label>성혼선언자 이름 또는 호칭<input className={inputClass} placeholder="비어 있으면 선택한 관계 호칭을 사용합니다." value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'pronouncement_speaker')} /></label>
+              <label>성혼선언자 이름 또는 호칭<input data-item-field="participantName" className={inputClass} placeholder="비어 있으면 선택한 관계 호칭을 사용합니다." value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'pronouncement_speaker')} /></label>
               <label>신랑·신부와의 관계<input className={inputClass} placeholder="예: 대학 은사" value={participant?.relation ?? ''} onChange={(e) => updateParticipant({ relation: e.target.value }, 'pronouncement_speaker')} /></label>
             </>
           )}
@@ -261,7 +301,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
 
       {item.type === 'officiant_entrance' && (
         <div className="form-grid two">
-          <label>주례 성함<input className={inputClass} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'officiant')} /></label>
+          <label>주례 성함<input data-item-field="participantName" className={inputClass} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'officiant')} /></label>
           <label>약력 또는 소개<input className={inputClass} value={participant?.introText ?? ''} onChange={(e) => updateParticipant({ introText: e.target.value }, 'officiant')} /></label>
         </div>
       )}
@@ -276,7 +316,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
             </div>
             <small>선택한 구분에 맞춰 화면 제목과 사회자 대본이 함께 바뀝니다.</small>
           </div>
-          <label>{item.detailConfig.speechType === 'congratulatory' ? '축사자 이름 또는 호칭' : '덕담자 이름 또는 호칭'}<input className={inputClass} placeholder={item.detailConfig.speechType === 'congratulatory' ? '예: 이동주, 김예식' : '예: 김영수'} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'speaker')} /></label>
+          <label>{item.detailConfig.speechType === 'congratulatory' ? '축사자 이름 또는 호칭' : '덕담자 이름 또는 호칭'}<input data-item-field="participantName" className={inputClass} placeholder={item.detailConfig.speechType === 'congratulatory' ? '예: 이동주, 김예식' : '예: 김영수'} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'speaker')} /></label>
           <label>신랑·신부와의 관계<input className={inputClass} placeholder={item.detailConfig.speechType === 'congratulatory' ? '예: 신부의 고등학교 친구, 신랑의 직장 동료' : '예: 신랑 아버지, 신부 어머니, 신랑 측 회사 대표'} value={participant?.relation ?? ''} onChange={(e) => updateParticipant({ relation: e.target.value }, 'speaker')} /></label>
           <p className="speech-participant-help full">이름 또는 관계를 입력하면 선택한 내용에 맞춰 사회자가 읽을 소개 문장을 자동으로 만들어요.</p>
           {hasPronouncementParticipant && (
@@ -290,6 +330,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
           performances={item.detailConfig.performances ?? []}
           onChange={(performances) => updateConfig({ performances })}
           focusTarget={performanceFocusTarget}
+          onCreated={onPerformanceCreated}
         />
       )}
 
@@ -305,7 +346,7 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
       {item.type === 'custom' && (
         <label>
           식순 설명
-          <textarea className={inputClass} rows={3} value={String(item.detailConfig.description ?? '')} onChange={(e) => updateConfig({ description: e.target.value })} placeholder="진행 방식과 참여자를 적어 주세요." />
+          <textarea data-item-field="description" className={inputClass} rows={3} value={String(item.detailConfig.description ?? '')} onChange={(e) => updateConfig({ description: e.target.value })} placeholder="진행 방식과 참여자를 적어 주세요." />
         </label>
       )}
 
@@ -346,13 +387,18 @@ export function ItemDetailEditor({ item, onChange, pronouncementParticipant, per
       </fieldset>
       <label>
         {item.type === 'custom' ? 'MC 대본 (필수)' : '기본 대본 전체 바꾸기'}
-        <textarea className={inputClass} rows={7} value={item.narrationOverride ?? ''} onChange={(event) => update({ narrationOverride: event.target.value })} placeholder={item.type === 'custom' || !item.useDefaultNarration ? '사회자가 읽을 전체 대본을 입력해 주세요.' : '입력하면 기본 대본 전체를 대체합니다.'} />
+        <textarea data-item-field="narrationOverride" className={inputClass} rows={7} value={item.narrationOverride ?? ''} onChange={(event) => update({ narrationOverride: event.target.value })} placeholder={item.type === 'custom' || !item.useDefaultNarration ? '사회자가 읽을 전체 대본을 입력해 주세요.' : '입력하면 기본 대본 전체를 대체합니다.'} />
         {item.type !== 'custom' && <small>내용을 입력하면 예식노트 기본 대본 대신 이 문장이 사용됩니다. 소개 문장 설정은 별도로 적용됩니다.</small>}
       </label>
       <label>
         사회자 요청사항
         <textarea className={inputClass} rows={3} value={item.requestNote ?? ''} onChange={(event) => update({ requestNote: event.target.value })} placeholder="낭독하지 않고 MC 화면에서 확인할 실행 메모" />
       </label>
+      {itemFocusTarget?.policyOnly && (
+        <div className="notice warm" role="status">
+          아직 입력 항목이 제공되지 않습니다. Product Owner 정책 확인이 필요합니다.
+        </div>
+      )}
     </section>
   );
 }
@@ -362,15 +408,26 @@ function AttendanceField({ label, value, onChange }: { label: string; value: str
 }
 
 const performanceCopy: Record<PerformanceItem['type'], { label: string; participantHeading: string }> = {
-  song: { label: '축가', participantHeading: '축가를 불러 주실 분' },
-  dance: { label: '축무', participantHeading: '축무를 선보일 분' },
-  instrumental: { label: '축주', participantHeading: '축주를 연주해 주실 분' },
+  song: { label: '축가', participantHeading: '축가자' },
+  dance: { label: '축무', participantHeading: '공연자' },
+  instrumental: { label: '축주', participantHeading: '연주자' },
 };
 
-function PerformanceEditor({ performances, onChange, focusTarget }: { performances: PerformanceItem[]; onChange: (value: PerformanceItem[]) => void; focusTarget?: PerformanceFocusTarget }) {
+function PerformanceEditor({ performances, onChange, focusTarget, onCreated }: { performances: PerformanceItem[]; onChange: (value: PerformanceItem[]) => void; focusTarget?: PerformanceFocusTarget; onCreated?: (performanceId: string) => void }) {
   const settingsRef = useRef<HTMLFieldSetElement>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const update = (id: string, patch: Partial<PerformanceItem>) => onChange(performances.map((p) => p.id === id ? { ...p, ...patch } : p));
+  const addPerformance = () => {
+    const id = createId('performance');
+    onChange([...performances, {
+      id,
+      type: 'song',
+      performerName: '',
+      samePerformerAsPrevious: false,
+      order: performances.length,
+    }]);
+    onCreated?.(id);
+  };
 
   useEffect(() => {
     if (!focusTarget || !settingsRef.current) return;
@@ -403,8 +460,14 @@ function PerformanceEditor({ performances, onChange, focusTarget }: { performanc
 
   return (
     <fieldset className="option-group" ref={settingsRef}>
-      <div className="subheading-row"><legend>축가·축무·축주 설정</legend><button type="button" className="text-button" data-performance-field="performances" onClick={() => onChange([...performances, { id: createId('performance'), type: 'song', performerName: '', samePerformerAsPrevious: false, order: performances.length }])}>+ 공연 추가</button></div>
-      {performances.length === 0 && <p className="muted">공연을 진행하려면 공연 항목을 추가해 주세요.</p>}
+      <div className="subheading-row"><legend>축가·축무·축주 설정</legend>{performances.length > 0 && <button type="button" className="text-button" data-performance-field="performances" onClick={addPerformance}>+ 공연 추가</button>}</div>
+      {performances.length === 0 && (
+        <div className="performance-empty-state">
+          <strong>등록된 공연이 없습니다</strong>
+          <p>축가·축무를 진행하려면 공연 정보를 추가해 주세요.</p>
+          <button type="button" className="button secondary" data-performance-field="performances" onClick={addPerformance}>첫 공연 추가</button>
+        </div>
+      )}
       {performances.map((performance, index) => (
         <div className="performance-card" data-performance-id={performance.id} key={performance.id}>
           <strong>공연 {index + 1} · {performanceCopy[performance.type].label}</strong>
