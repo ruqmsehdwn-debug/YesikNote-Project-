@@ -202,6 +202,25 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
 .review-script ul { background: var(--blue-soft); padding: 14px 14px 14px 34px; border-radius: 10px; color: #315d79; font-size: 12px; }
 .inline-note { background: var(--orange-soft); color: #844d37; padding: 12px; border-radius: 9px; font-size: 12px; }
 .inline-note strong { display: block; margin-bottom: 5px; }
+.venue-checklist-preview { margin: 26px 0; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #fdfcf8; }
+.venue-checklist-preview > header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
+.venue-checklist-preview h2 { margin: 6px 0; color: var(--navy); font-family: Georgia, "Noto Serif KR", serif; }
+.venue-checklist-preview header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.readonly-badge { flex: 0 0 auto; border: 1px solid #b7cedb; border-radius: 99px; padding: 6px 10px; background: var(--blue-soft); color: #315d79; font-size: 10px; font-weight: 800; }
+.venue-checklist-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.venue-checklist-row { min-width: 0; border: 1px solid #e0e0da; border-radius: 11px; padding: 12px 14px; background: white; }
+.venue-checklist-row dt { color: var(--muted); font-size: 10px; font-weight: 800; }
+.venue-checklist-row dd { margin: 6px 0 0; overflow-wrap: anywhere; color: var(--navy); font-size: 13px; line-height: 1.55; }
+.venue-checklist-row dd.needs-confirmation { color: #95651d; font-weight: 750; }
+.venue-checklist-notes, .venue-checklist-warnings { margin-top: 14px; border-radius: 11px; padding: 14px 16px; }
+.venue-checklist-notes { background: var(--blue-soft); color: #315d79; }
+.venue-checklist-warnings { background: #fff9e9; border: 1px solid #eed6a1; color: #72531d; }
+.venue-checklist-notes h3, .venue-checklist-warnings h3 { margin: 0 0 8px; font-size: 13px; }
+.venue-checklist-notes ul, .venue-checklist-warnings ul { margin: 0; padding-left: 19px; font-size: 12px; line-height: 1.6; }
+.venue-checklist-notes li + li, .venue-checklist-warnings li + li { margin-top: 5px; }
+.venue-checklist-notes strong, .venue-checklist-notes span { display: block; }
+.venue-checklist-notes strong { font-size: 10px; }
+.venue-checklist-warnings p { margin: 0; font-size: 12px; }
 
 .mc-shell { min-height: 100vh; padding-bottom: 118px; transition: background .2s, color .2s; }
 .mc-shell.dark { background: #0c141d; color: #edf3f7; --mc-card: #13212e; --mc-line: #263a4c; --mc-muted: #9babb8; }
@@ -274,7 +293,10 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
   .step-nav button { font-size: 0; }
   .step-nav button span { font-size: 11px; margin: 0; }
   .workspace, .workspace.with-preview { width: min(100% - 24px, 1420px); padding-top: 30px; }
-  .form-grid.two, .type-grid, .review-summary, .mc-support-grid { grid-template-columns: 1fr; }
+  .form-grid.two, .type-grid, .review-summary, .mc-support-grid, .venue-checklist-grid { grid-template-columns: 1fr; }
+  .venue-checklist-preview { padding: 16px; }
+  .venue-checklist-preview > header { display: block; }
+  .readonly-badge { display: inline-flex; margin-top: 10px; }
   .page-heading h1 { font-size: 31px; }
   .heading-row { display: block; }
   .heading-actions { margin: -10px 0 22px; }
