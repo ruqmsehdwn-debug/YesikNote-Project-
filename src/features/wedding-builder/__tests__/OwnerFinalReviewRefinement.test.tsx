@@ -195,7 +195,7 @@ describe('Owner 최종 확인 W4.1 개선', () => {
 
     fireEvent.click(within(row).getByRole('button', { name: '바로 수정' }));
 
-    expect(view.getByRole('combobox', { name: '편집할 식순' })).toHaveValue(performance.id);
+    expect(view.getByRole('combobox', { name: '식순 선택' })).toHaveValue(performance.id);
     expect(view.getByRole('button', { name: '첫 공연 추가' })).toHaveFocus();
     expect(view.getByRole('status')).toHaveTextContent('확인할 입력칸으로 이동했습니다.');
   });

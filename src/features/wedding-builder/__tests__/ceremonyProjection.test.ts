@@ -3,6 +3,26 @@ import { createDraft } from '../data/ceremonyTemplates';
 import { buildCeremonyProjection } from '../services/ceremonyProjection';
 
 describe('buildCeremonyProjection', () => {
+  it('주례 있는 예식의 기존 인물 데이터로 주례 정보를 만든다', () => {
+    const draft = createDraft('officiant');
+    const officiant = draft.items.find((item) => item.type === 'officiant_entrance')!;
+    officiant.participants = [{
+      id: 'officiant-person',
+      role: 'officiant',
+      name: '김주례',
+      relation: '대학 은사',
+    }];
+
+    const projection = buildCeremonyProjection(draft);
+
+    expect(projection.officiant).toEqual(expect.objectContaining({
+      sourceId: officiant.id,
+      active: true,
+      summary: '김주례 · 대학 은사',
+      status: 'known',
+    }));
+  });
+
   it('성혼선언 주체를 체크표와 MC 대본 힌트에 같은 값으로 연결한다', () => {
     const draft = createDraft();
     const declaration = draft.items.find((item) => item.type === 'pronouncement')!;

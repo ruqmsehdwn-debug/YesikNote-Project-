@@ -24,6 +24,7 @@ import { ScriptPreview } from '../components/ScriptPreview';
 import { SortableItemList } from '../components/SortableItemList';
 import { VenueChecklistPreview } from '../components/VenueChecklistPreview';
 import { FinalCeremonySheet } from '../components/FinalCeremonySheet';
+import { CeremonyItemNavigator } from '../components/CeremonyItemNavigator';
 import {
   ToastRegion,
   type ToastMessage,
@@ -344,9 +345,12 @@ export function OwnerBuilderPage({
           )}
           {step === 4 && (
             <div className="detail-layout">
-              <div className="detail-rail">
-                <label className="select-label">편집할 식순<select value={selectedItem?.id ?? ''} onChange={(e) => selectItem(e.target.value)}>{draft.items.map((item) => <option value={item.id} key={item.id}>{item.order + 1}. {ceremonyItemDisplayTitle(item)}{item.active ? '' : ' (미진행)'}</option>)}</select></label>
-              </div>
+              <CeremonyItemNavigator
+                items={draft.items}
+                selectedId={selectedItem?.id}
+                issues={blocking}
+                onSelect={selectItem}
+              />
               {selectedItem && displayedSelectedItem ? (
                 <ItemDetailEditor
                   item={displayedSelectedItem}

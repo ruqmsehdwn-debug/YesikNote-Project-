@@ -302,6 +302,7 @@ export function ItemDetailEditor({
       {item.type === 'officiant_entrance' && (
         <div className="form-grid two">
           <label>주례 성함<input data-item-field="participantName" className={inputClass} value={participant?.name ?? ''} onChange={(e) => updateParticipant({ name: e.target.value }, 'officiant')} /></label>
+          <label>직함 또는 관계<input className={inputClass} value={participant?.relation ?? ''} onChange={(e) => updateParticipant({ relation: e.target.value }, 'officiant')} placeholder="예: 담임목사, 대학 은사" /></label>
           <label>약력 또는 소개<input className={inputClass} value={participant?.introText ?? ''} onChange={(e) => updateParticipant({ introText: e.target.value }, 'officiant')} /></label>
         </div>
       )}

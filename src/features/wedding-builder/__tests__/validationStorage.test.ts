@@ -225,7 +225,7 @@ describe('validation and storage', () => {
       expect(within(issueRow).queryByText(/덕담|축사/)).not.toBeInTheDocument();
       fireEvent.click(within(issueRow).getByRole('button', { name: '바로 수정' }));
 
-      expect(view.getByRole('combobox', { name: '편집할 식순' })).toHaveValue(performance.id);
+      expect(view.getByRole('combobox', { name: '식순 선택' })).toHaveValue(performance.id);
       const targetCard = view.container.querySelector('[data-performance-id="performance-invalid-second"]')!;
       const titleInput = targetCard.querySelector('[data-performance-field="title"]');
       expect(targetCard).toHaveClass('performance-target');
@@ -1035,6 +1035,30 @@ describe('validation and storage', () => {
   it('손상된 저장 데이터는 입력 상태로 사용하지 않는다', () => {
     localStorage.setItem(DRAFT_STORAGE_KEY, '{broken');
     expect(loadDraft()).toBeNull();
+  });
+
+  it('기존 주례 인물 구조에 직함 또는 관계를 저장한다', () => {
+    const draft = createDraft('officiant');
+    const officiant = draft.items.find((item) => item.type === 'officiant_entrance')!;
+    const onChange = vi.fn();
+    const view = render(createElement(ItemDetailEditor, {
+      item: officiant,
+      onChange,
+    }));
+
+    fireEvent.change(view.getByLabelText('직함 또는 관계'), {
+      target: { value: '대학 은사' },
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: officiant.id,
+      participants: [
+        expect.objectContaining({
+          role: 'officiant',
+          relation: '대학 은사',
+        }),
+      ],
+    }));
   });
 
   it('한글 받침에 따라 조사를 자연스럽게 선택한다', () => {

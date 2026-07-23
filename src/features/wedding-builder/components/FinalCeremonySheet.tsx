@@ -69,12 +69,6 @@ function venueLabel(draft: CeremonyDraft) {
   return values.length ? values.join(' · ') : '확인 필요';
 }
 
-function officiantLabel(projection: CeremonyProjection) {
-  if (projection.officiantType === 'officiant') return '주례 있음';
-  if (projection.officiantType === 'no_officiant') return '무주례';
-  return '확인 필요';
-}
-
 function cleanWarning(warning: string, sourceId: string) {
   return warning.replace(` (${sourceId})`, '');
 }
@@ -372,7 +366,9 @@ export function FinalCeremonySheet({
             <div><dt>예식 시간</dt><dd><span className="needs-confirmation">확인 필요</span></dd></div>
             <div><dt>예식장·홀</dt><dd><SheetValue value={venueLabel(draft)} /></dd></div>
             <div><dt>예식 형태</dt><dd><SheetValue value={projection.ceremonyType.status === 'known' ? projection.ceremonyType.label : '확인 필요'} /></dd></div>
-            <div><dt>주례 유무</dt><dd><SheetValue value={officiantLabel(projection)} /></dd></div>
+            {projection.officiantType === 'officiant' && (
+              <div><dt>주례 정보</dt><dd><SheetValue value={projection.officiant.status === 'known' ? projection.officiant.summary : '확인 필요'} /></dd></div>
+            )}
             <div><dt>현재 상태</dt><dd>미리보기 · PROPOSED</dd></div>
           </dl>
 
