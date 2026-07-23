@@ -24,7 +24,7 @@ export function useDraft() {
   );
 
   const saveNow = useCallback(() => {
-    if (saving.current) return;
+    if (saving.current) return false;
     if (autosaveTimeout.current !== null) {
       window.clearTimeout(autosaveTimeout.current);
       autosaveTimeout.current = null;
@@ -35,8 +35,10 @@ export function useDraft() {
       const savedAt = saveDraft(draft);
       setLastSavedAt(savedAt);
       setSaveStatus('saved');
+      return true;
     } catch {
       setSaveStatus('failed');
+      return false;
     } finally {
       saving.current = false;
     }

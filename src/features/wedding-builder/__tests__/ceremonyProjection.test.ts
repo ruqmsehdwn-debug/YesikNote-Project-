@@ -31,7 +31,7 @@ describe('buildCeremonyProjection', () => {
     }));
   });
 
-  it('축가 공연 카드 2개를 두 곡 요약과 공연 상세로 보존한다', () => {
+  it('축가 공연 카드 2개를 축가 2곡 요약과 공연 상세로 보존한다', () => {
     const draft = createDraft();
     const performance = draft.items.find((item) => item.type === 'performance')!;
     performance.detailConfig.performances = [
@@ -67,12 +67,10 @@ describe('buildCeremonyProjection', () => {
     expect(checklistItem?.summary).toContain('축가 2곡');
     expect(checklistItem?.summary).toContain('첫 번째 곡');
     expect(checklistItem?.summary).toContain('두 번째 곡');
-    expect(projection.sourceWarnings).toContain(
-      '축가 곡 수는 현재 별도 수량 필드가 없어 축가 공연 카드 수로 계산했습니다.',
-    );
+    expect(projection.sourceWarnings.join(' ')).not.toContain('축가 곡 수');
   });
 
-  it('active=false 항목은 체크표와 MC 힌트에서 제외하고 경고로 남긴다', () => {
+  it('active=false 항목은 체크표와 MC 힌트에서 제외하고 내부 정책 경고를 Owner 데이터에 넣지 않는다', () => {
     const draft = createDraft();
     const declaration = draft.items.find((item) => item.type === 'pronouncement')!;
     declaration.active = false;
@@ -90,12 +88,8 @@ describe('buildCeremonyProjection', () => {
     expect(projection.mcScriptHints.some(
       (item) => item.sourceId === declaration.id,
     )).toBe(false);
-    expect(projection.sourceWarnings).toContain(
-      `미진행 항목 제외: ${declaration.title} (${declaration.id})`,
-    );
-    expect(projection.sourceWarnings).toContain(
-      '정책 확인 필요: 성혼선언을 체크표에서 숨길지 ‘미진행’으로 표시할지 확정되지 않았습니다.',
-    );
+    expect(projection.sourceWarnings.join(' ')).not.toContain('미진행 항목 제외');
+    expect(projection.sourceWarnings.join(' ')).not.toContain('정책 확인 필요');
   });
 
   it('Projection 생성 과정에서 입력 Draft를 변경하지 않는다', () => {

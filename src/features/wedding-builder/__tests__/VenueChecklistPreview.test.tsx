@@ -88,10 +88,10 @@ describe('VenueChecklistPreview', () => {
 
     expect(within(materialRow).getByText('확인 필요')).toBeInTheDocument();
     expect(within(musicRow).getByText('확인 필요')).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: '확인 필요' })).toBeInTheDocument();
+    expect(view.getByText(/예식장 확인 필요사항 \d+개/)).toBeInTheDocument();
   });
 
-  it('active=false 항목은 미진행으로 보이되 미확정 정책 경고를 함께 표시한다', () => {
+  it('active=false 항목은 미진행으로 보이고 내부 정책 경고는 표시하지 않는다', () => {
     const draft = createDraft();
     const declaration = draft.items.find((item) => item.type === 'pronouncement')!;
     declaration.active = false;
@@ -99,7 +99,7 @@ describe('VenueChecklistPreview', () => {
     const declarationRow = checklistRow(view, '성혼선언');
 
     expect(within(declarationRow).getByText('미진행')).toBeInTheDocument();
-    expect(view.getByText(/정책 확인 필요: 성혼선언을 체크표에서 숨길지/)).toBeInTheDocument();
+    expect(view.queryByText(/정책 확인 필요/)).not.toBeInTheDocument();
   });
 
   it('렌더링 중 Draft/localStorage 모듈을 호출하지 않는다', () => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CeremonyDraft } from '../../wedding-builder/models/ceremony';
+import { buildCeremonyProjection } from '../../wedding-builder/services/ceremonyProjection';
 import { generateScript } from '../../wedding-builder/services/scriptEngine';
 import {
   loadMcState,
@@ -10,12 +11,24 @@ import {
 
 export function McPrompterPage({ draft }: { draft: CeremonyDraft }) {
   const script = useMemo(() => generateScript(draft), [draft]);
+  const projection = useMemo(
+    () => buildCeremonyProjection(draft, script),
+    [draft, script],
+  );
   const allSections = [...script.preCeremonyChecklist, ...script.ceremonySections];
   const [state, setState] = useState<McPrompterState>(() => loadMcState(draft.id));
   const initialIndex = Math.max(0, allSections.findIndex((section) => section.id === state.currentSectionId));
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const current = allSections[currentIndex];
   const next = allSections[currentIndex + 1];
+  const currentWarnings = current
+    ? projection.sourceWarnings
+      .filter((warning) => (
+        warning.includes(`(${current.id})`)
+        || warning.includes(current.title)
+      ))
+      .map((warning) => warning.replace(` (${current.id})`, ''))
+    : [];
 
   useEffect(() => {
     setState((previous) => {
@@ -59,6 +72,12 @@ export function McPrompterPage({ draft }: { draft: CeremonyDraft }) {
       {script.globalRequestNote && <aside className="mc-global-note"><strong>전체 요청사항</strong><p>{script.globalRequestNote}</p></aside>}
 
       <main className="mc-content">
+        {!!currentWarnings.length && (
+          <aside className="mc-confirmation" aria-labelledby="mc-confirmation-title">
+            <h2 id="mc-confirmation-title">현재 식순 확인 필요</h2>
+            <ul>{currentWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          </aside>
+        )}
         <article className="mc-script-card">
           <div className="mc-section-label"><span>{currentIndex + 1}</span><strong>{current.title}</strong>{state.completedSectionIds.includes(current.id) && <em>완료</em>}</div>
           <div className="mc-narration">{current.narration.split('\n').map((paragraph, index) => <p key={`${paragraph}-${index}`}>{paragraph}</p>)}</div>

@@ -3,6 +3,7 @@ import type {
   CeremonyItem,
   CeremonyType,
   PerformanceItem,
+  ScriptPackage,
 } from '../models/ceremony';
 import { generateScript } from './scriptEngine';
 
@@ -188,7 +189,7 @@ function buildVow(
   return {
     sourceId: item.id,
     active: true,
-    summary: participant ? `진행 · 낭독: ${participant}` : '진행 · 낭독 주체 UNKNOWN',
+    summary: participant ? `낭독자: ${participant}` : '낭독자 UNKNOWN',
     participant,
     status: participant ? 'known' : 'unknown',
   };
@@ -212,7 +213,7 @@ function buildDeclaration(
   return {
     sourceId: item.id,
     active: true,
-    summary: participant ? `진행 · 주체: ${participant}` : '진행 · 주체 UNKNOWN',
+    summary: participant ? `진행자: ${participant}` : '진행자 UNKNOWN',
     participant,
     status: participant ? 'known' : 'unknown',
   };
@@ -240,7 +241,7 @@ function buildSpeech(
   return {
     sourceId: item.id,
     active: true,
-    summary: participant ? `${label} · 주체: ${participant}` : `${label} · 주체 UNKNOWN`,
+    summary: participant ? `${label}자: ${participant}` : `${label}자 UNKNOWN`,
     participant,
     status: participant ? 'known' : 'unknown',
   };
@@ -276,15 +277,15 @@ function buildPerformance(
     title: performance.title,
   }));
   const songs = performances.filter((performance) => performance.type === 'song');
-  if (!performances.length) warnings.push('진행 중인 공연 항목에 공연 카드가 없습니다.');
-  if (songs.length) {
-    warnings.push('축가 곡 수는 현재 별도 수량 필드가 없어 축가 공연 카드 수로 계산했습니다.');
-  }
+  if (!performances.length) warnings.push(`진행 중인 공연 항목에 공연 카드가 없습니다. (${item.id})`);
 
   const counts = (['song', 'dance', 'instrumental'] as const)
     .map((type) => {
       const count = performances.filter((performance) => performance.type === type).length;
-      return count ? `${performanceTypeLabels[type]} ${count}${type === 'song' ? '곡' : '건'}` : '';
+      if (!count) return '';
+      return type === 'song'
+        ? `${performanceTypeLabels[type]} ${count}곡`
+        : `${performanceTypeLabels[type]} ${count}건`;
     })
     .filter(Boolean);
   const details = performances.map((performance) => {
@@ -297,7 +298,7 @@ function buildPerformance(
   return {
     sourceId: item.id,
     active: true,
-    summary: [...counts, ...details].join(' / ') || '진행 · 세부 정보 UNKNOWN',
+    summary: [...counts, ...details].join(' · ') || '진행 · 세부 정보 UNKNOWN',
     status: performances.length ? 'known' : 'unknown',
     songCount: songs.length,
     items: projectedItems,
@@ -414,22 +415,13 @@ function summaryForChecklistItem(
   return '진행';
 }
 
-export function buildCeremonyProjection(draft: CeremonyDraft): CeremonyProjection {
+export function buildCeremonyProjection(
+  draft: CeremonyDraft,
+  sharedScript?: ScriptPackage,
+): CeremonyProjection {
   const sourceWarnings: string[] = [];
   const items = sortedItems(draft);
-  items
-    .filter((item) => !item.active)
-    .forEach((item) => {
-      sourceWarnings.push(`미진행 항목 제외: ${item.title} (${item.id})`);
-      sourceWarnings.push(
-        `정책 확인 필요: ${item.title}을 체크표에서 숨길지 ‘미진행’으로 표시할지 확정되지 않았습니다.`,
-      );
-    });
-  items
-    .filter((item) => item.narrationOverride?.trim())
-    .forEach((item) => sourceWarnings.push(
-      `직접 수정 대본 확인 필요: ${item.title} (${item.id})`,
-    ));
+  sourceWarnings.push('자료 준비 상태를 예식장과 확인해 주세요.');
 
   const ceremonyTypeStatus: ProjectionStatus = ['no_officiant', 'officiant']
     .includes(draft.ceremonyType)
@@ -480,7 +472,7 @@ export function buildCeremonyProjection(draft: CeremonyDraft): CeremonyProjectio
     sourceWarnings,
   );
   if (processionItem?.active) {
-    sourceWarnings.push('행진 방식과 음원 재생 타이밍의 전용 필드가 없습니다.');
+    sourceWarnings.push(`음원 재생 타이밍을 예식장과 확인해 주세요. (${processionItem.id})`);
   }
 
   const projectionBase = {
@@ -514,7 +506,7 @@ export function buildCeremonyProjection(draft: CeremonyDraft): CeremonyProjectio
       summary: summaryForChecklistItem(item, projectionBase),
     }));
 
-  const script = generateScript(draft);
+  const script = sharedScript ?? generateScript(draft);
   const participantBySourceId = new Map<string, string | undefined>([
     [vow.sourceId ?? '', vow.participant],
     [declaration.sourceId ?? '', declaration.participant],

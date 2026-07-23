@@ -67,7 +67,7 @@ describe('validation and storage', () => {
           requestId: 1,
         },
       }));
-      const performerInput = view.getByLabelText('축가를 불러 주실 분');
+      const performerInput = view.getByLabelText('축가자');
       const card = view.container.querySelector('[data-performance-id="performance-focus-target"]')!;
 
       expect(document.activeElement).toBe(performerInput);
@@ -121,7 +121,7 @@ describe('validation and storage', () => {
         },
       }));
 
-      expect(document.activeElement).toBe(view.getByRole('button', { name: '+ 공연 추가' }));
+      expect(document.activeElement).toBe(view.getByRole('button', { name: '첫 공연 추가' }));
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
       view.unmount();
     } finally {
@@ -223,7 +223,7 @@ describe('validation and storage', () => {
 
       expect(within(issueRow).getByText('축가/축주')).toBeInTheDocument();
       expect(within(issueRow).queryByText(/덕담|축사/)).not.toBeInTheDocument();
-      fireEvent.click(within(issueRow).getByRole('button', { name: '입력하기' }));
+      fireEvent.click(within(issueRow).getByRole('button', { name: '바로 수정' }));
 
       expect(view.getByRole('combobox', { name: '편집할 식순' })).toHaveValue(performance.id);
       const targetCard = view.container.querySelector('[data-performance-id="performance-invalid-second"]')!;
@@ -667,7 +667,7 @@ describe('validation and storage', () => {
     const select = view.getByRole('combobox', { name: '공연 종류' });
 
     expect(view.getByText('공연 1 · 축가')).toBeInTheDocument();
-    expect(view.getByRole('textbox', { name: '축가를 불러 주실 분' })).toHaveAttribute('placeholder', '예: 이동주, 김예식');
+    expect(view.getByRole('textbox', { name: '축가자' })).toHaveAttribute('placeholder', '예: 이동주, 김예식');
     expect(view.getByRole('textbox', { name: '신랑·신부와의 관계' })).toHaveAttribute('placeholder', '예: 신랑의 고등학교 친구');
     expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['축가', '축무', '축주']);
     expect(within(select).queryByRole('option', { name: '덕담' })).not.toBeInTheDocument();
@@ -799,7 +799,7 @@ describe('validation and storage', () => {
     ['groomName', '신랑 이름을 입력해 주세요.'],
     ['brideName', '신부 이름을 입력해 주세요.'],
     ['banquetLocation', '피로연 장소를 입력해 주세요.'],
-  ] as const)('기본정보 %s 오류의 입력하기는 1단계 정확한 입력칸으로 이동한다', (field, message) => {
+  ] as const)('기본정보 %s 오류의 바로 수정은 1단계 정확한 입력칸으로 이동한다', (field, message) => {
     const draft = completeBasic();
     draft.basicInfo[field] = '';
     draft.lastStep = 5;
@@ -814,7 +814,7 @@ describe('validation and storage', () => {
     );
 
     const issueRow = view.getByText(message).closest('div')!;
-    fireEvent.click(within(issueRow).getByRole('button', { name: '입력하기' }));
+    fireEvent.click(within(issueRow).getByRole('button', { name: '바로 수정' }));
     const input = view.container.querySelector(`[data-basic-field="${field}"]`);
     expect(input).toBeInTheDocument();
     expect(document.activeElement).toBe(input);
@@ -851,7 +851,7 @@ describe('validation and storage', () => {
       })),
     );
 
-    expect(view.getByText('준비가 완료되었습니다. 사회자용 대본을 확인해 보세요.')).toBeInTheDocument();
+    expect(view.getAllByText(/필수 작성은 완료됐습니다/).length).toBeGreaterThan(0);
     expect(view.getByRole('link', { name: '사회자용 대본 열기' })).toBeInTheDocument();
     expect(view.queryByText(/필수 입력 \d+개를 더 완료/)).not.toBeInTheDocument();
     view.unmount();
