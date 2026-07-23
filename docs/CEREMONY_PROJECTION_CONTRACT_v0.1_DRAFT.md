@@ -308,3 +308,17 @@ CeremonyDraft — 현재 한 예식의 기준 데이터
 Projection 함수와 Preview는 원본 Draft를 바꾸지 않고 같은 안정 ID·순서·활성 상태를 읽는다. Draft/localStorage와 기존 Script Engine 파일은 변경하지 않았다. 다음에는 자료 상태·음원 타이밍·Final Snapshot처럼 새 데이터가 필요한 범위를 Product Owner가 먼저 결정해야 하며, 직접 수정 대본과 충돌 가능한 값은 자동으로 덮어쓰지 않는다.
 
 이 문서는 구현 완료 문서가 아니라 Product Owner와 개발자가 함께 검토할 변환 계약 초안이다.
+
+## 16. W3 소비 화면 구현 상태
+
+`CeremonyDraft → CeremonyProjection → FinalCeremonySheet` 소비 경로가 `IMPLEMENTED`되었다.
+
+- Projection은 기존 순수 함수이며 Draft를 수정하지 않는다.
+- 최종 식순표는 활성 항목을 실제 `order`로 정렬하고 안정 ID를 DOM source 기준으로 유지한다.
+- Cue와 Note는 `ScriptPackage`에서 읽되 서로 다른 열에 표시한다.
+- `sourceWarnings`는 공동 확인 필요사항으로 표시하며 내부 source ID는 사용자 화면에서 제거한다.
+- 공연은 Projection의 카드 순서를 사용하되, 정책 미확정 때문에 최종 표에서 카드 수를 곡 수로 확정하지 않는다.
+- `active=false`는 기본 실행 표에서 제외하고 별도 미진행 목록에 표시한다.
+- A4 인쇄는 현재 화면의 Projection 결과를 인쇄할 뿐 Snapshot을 생성하지 않는다.
+
+자동 검증은 7개 테스트 파일·152개 테스트, build, typecheck, `git diff --check`를 통과했다. Draft/localStorage key·schema, Script Engine 핵심 파일, MC 화면은 `NOT CHANGED`다. 이 구현으로 Final Snapshot이나 주말 통합 운영표가 완성된 것은 아니다.

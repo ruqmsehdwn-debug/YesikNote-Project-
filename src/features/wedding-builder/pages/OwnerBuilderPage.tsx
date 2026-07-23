@@ -20,6 +20,7 @@ import { ItemDetailEditor } from '../components/ItemDetailEditor';
 import { ScriptPreview } from '../components/ScriptPreview';
 import { SortableItemList } from '../components/SortableItemList';
 import { VenueChecklistPreview } from '../components/VenueChecklistPreview';
+import { FinalCeremonySheet } from '../components/FinalCeremonySheet';
 import { buildCeremonyProjection } from '../services/ceremonyProjection';
 
 type Props = {
@@ -312,6 +313,7 @@ function ReviewStep({ draft, script, projection, blocking, warnings, onEdit }: {
       {!blocking.length && <div className="notice success">필수 입력이 모두 완료되었습니다.</div>}
       {draft.basicInfo.globalRequestNote && <div className="global-note"><span>전체 요청사항</span><p>{draft.basicInfo.globalRequestNote}</p></div>}
       <VenueChecklistPreview projection={projection} />
+      <FinalCeremonySheet draft={draft} projection={projection} script={script} />
       <div className="review-script">{script.ceremonySections.map((section, index) => <article key={section.id}><div className="review-number">{index + 1}</div><div><h3>{section.title}</h3><p>{section.narration || 'MC 대본이 비어 있습니다.'}</p>{!!section.cue.length && <ul>{section.cue.map((cue) => <li key={cue}>{cue}</li>)}</ul>}{!!section.note.length && <div className="inline-note"><strong>주의사항 / 실행 메모</strong>{section.note.join(' · ')}</div>}</div></article>)}</div>
     </div>
   );

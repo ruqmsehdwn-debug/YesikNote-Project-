@@ -221,6 +221,44 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
 .venue-checklist-notes strong, .venue-checklist-notes span { display: block; }
 .venue-checklist-notes strong { font-size: 10px; }
 .venue-checklist-warnings p { margin: 0; font-size: 12px; }
+.final-ceremony-sheet { margin: 30px 0; border: 1px solid #cfd7dc; border-radius: 18px; background: white; overflow: hidden; }
+.final-sheet-header { display: flex; justify-content: space-between; gap: 20px; padding: 24px; border-bottom: 1px solid #dfe4e7; background: #f7f9f9; }
+.final-sheet-header h2 { margin: 6px 0; color: var(--navy); font-family: Georgia, "Noto Serif KR", serif; font-size: 26px; }
+.final-sheet-header p { max-width: 720px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.final-sheet-actions { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; }
+.print-sheet-button { min-height: 32px; padding: 7px 13px; font-size: 11px; }
+.final-sheet-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-bottom: 1px solid #dfe4e7; }
+.final-sheet-meta > div { min-width: 0; padding: 13px 15px; border-right: 1px solid #e4e8ea; border-bottom: 1px solid #e4e8ea; }
+.final-sheet-meta > div:nth-child(4n) { border-right: 0; }
+.final-sheet-meta > div:nth-last-child(-n + 4) { border-bottom: 0; }
+.final-sheet-meta dt { color: var(--muted); font-size: 10px; font-weight: 800; }
+.final-sheet-meta dd { margin: 5px 0 0; overflow-wrap: anywhere; color: var(--navy); font-size: 13px; font-weight: 750; line-height: 1.45; }
+.needs-confirmation { color: #95651d !important; font-weight: 800; }
+.final-sheet-table-wrap { overflow-x: auto; }
+.final-sheet-table { width: 100%; min-width: 960px; border-collapse: collapse; table-layout: fixed; }
+.final-sheet-table th, .final-sheet-table td { border-right: 1px solid #dfe4e7; border-bottom: 1px solid #dfe4e7; padding: 12px 11px; vertical-align: top; overflow-wrap: anywhere; font-size: 11px; line-height: 1.55; text-align: left; }
+.final-sheet-table th:last-child, .final-sheet-table td:last-child { border-right: 0; }
+.final-sheet-table thead th { background: var(--navy); color: white; font-size: 10px; letter-spacing: .03em; }
+.final-sheet-table thead th:nth-child(1) { width: 48px; text-align: center; }
+.final-sheet-table thead th:nth-child(2) { width: 124px; }
+.final-sheet-table thead th:nth-child(3) { width: 210px; }
+.final-sheet-table thead th:nth-child(4), .final-sheet-table thead th:nth-child(5) { width: 190px; }
+.final-sheet-table tbody > tr > td:first-child { color: var(--muted); font-weight: 850; text-align: center; }
+.final-sheet-table tbody th { color: var(--navy); background: #fbfcfc; }
+.final-sheet-table tbody tr:last-child > * { border-bottom: 0; }
+.final-sheet-table ul { margin: 0; padding-left: 16px; }
+.final-sheet-table li + li { margin-top: 5px; }
+.sheet-summary { white-space: pre-line; color: #344d5d; }
+.sheet-empty { color: #9aa6ad; }
+.sheet-warnings { color: #806025; }
+.inactive-ceremony-items, .final-sheet-confirmations { margin: 18px 22px; border-radius: 12px; padding: 15px 17px; }
+.inactive-ceremony-items { border: 1px dashed #bdc9cf; background: #f8fafb; }
+.final-sheet-confirmations { border: 1px solid #eed6a1; background: #fff9e9; color: #72531d; }
+.inactive-ceremony-items h3, .final-sheet-confirmations h3 { margin: 0 0 7px; font-size: 13px; }
+.inactive-ceremony-items p, .final-sheet-confirmations p { margin: 0; font-size: 11px; line-height: 1.55; }
+.inactive-ceremony-items ul, .final-sheet-confirmations ul { margin: 8px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.55; }
+.inactive-ceremony-items li { display: inline-block; margin: 4px 8px 0 0; border-radius: 99px; padding: 4px 8px; background: #e8eef1; }
+.final-sheet-footer { display: flex; justify-content: space-between; gap: 16px; padding: 13px 22px; border-top: 1px solid #dfe4e7; background: #f7f9f9; color: var(--muted); font-size: 10px; }
 
 .mc-shell { min-height: 100vh; padding-bottom: 118px; transition: background .2s, color .2s; }
 .mc-shell.dark { background: #0c141d; color: #edf3f7; --mc-card: #13212e; --mc-line: #263a4c; --mc-muted: #9babb8; }
@@ -296,6 +334,22 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
   .form-grid.two, .type-grid, .review-summary, .mc-support-grid, .venue-checklist-grid { grid-template-columns: 1fr; }
   .venue-checklist-preview { padding: 16px; }
   .venue-checklist-preview > header { display: block; }
+  .final-sheet-header { display: block; padding: 18px; }
+  .final-sheet-actions { margin-top: 14px; }
+  .final-sheet-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .final-sheet-meta > div:nth-child(4n) { border-right: 1px solid #e4e8ea; }
+  .final-sheet-meta > div:nth-child(2n) { border-right: 0; }
+  .final-sheet-meta > div:nth-last-child(-n + 4) { border-bottom: 1px solid #e4e8ea; }
+  .final-sheet-meta > div:nth-last-child(-n + 2) { border-bottom: 0; }
+  .final-sheet-table { min-width: 0; }
+  .final-sheet-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .final-sheet-table tbody, .final-sheet-table tr, .final-sheet-table th, .final-sheet-table td { display: block; width: 100%; }
+  .final-sheet-table tbody tr { border-bottom: 8px solid #eef2f3; }
+  .final-sheet-table tbody tr:last-child { border-bottom: 0; }
+  .final-sheet-table th, .final-sheet-table td { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; border-right: 0; text-align: left !important; }
+  .final-sheet-table th::before, .final-sheet-table td::before { content: attr(data-label); color: var(--muted); font-size: 9px; font-weight: 850; }
+  .final-sheet-table tbody th { background: #f7f9f9; }
+  .final-sheet-footer { display: grid; }
   .readonly-badge { display: inline-flex; margin-top: 10px; }
   .page-heading h1 { font-size: 31px; }
   .heading-row { display: block; }
@@ -332,4 +386,40 @@ textarea.field-input { resize: vertical; line-height: 1.65; }
   .item-actions { grid-template-columns: repeat(3, 1fr); }
   .choice-grid { grid-template-columns: 1fr; }
   .step-controls .button { flex: 1; padding-inline: 10px; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  html, body, #root { width: auto; min-width: 0; background: white !important; }
+  body { color: #111; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .app-header, .progress-wrap, .step-controls,
+  .page-section > :not(.final-ceremony-sheet) { display: none !important; }
+  .owner-shell, .workspace, .workspace-main, .page-section {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  .final-ceremony-sheet { margin: 0; border: 0; border-radius: 0; overflow: visible; }
+  .final-sheet-header { padding: 0 0 10mm; background: white; }
+  .final-sheet-actions { display: none !important; }
+  .final-sheet-meta { grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #555; }
+  .final-sheet-meta > div { padding: 7px 8px; border-color: #777 !important; }
+  .final-sheet-table-wrap { overflow: visible; }
+  .final-sheet-table { display: table; min-width: 0; font-size: 8.5pt; }
+  .final-sheet-table thead { display: table-header-group; position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
+  .final-sheet-table tbody { display: table-row-group; }
+  .final-sheet-table tr { display: table-row; break-inside: avoid; page-break-inside: avoid; }
+  .final-sheet-table th, .final-sheet-table td { display: table-cell; width: auto; padding: 6px; border-color: #666; font-size: 8pt; line-height: 1.4; }
+  .final-sheet-table th::before, .final-sheet-table td::before { content: none; }
+  .final-sheet-table thead th { background: #e8ecee !important; color: #111; border-top: 1px solid #555; }
+  .final-sheet-table thead th:nth-child(1) { width: 6%; }
+  .final-sheet-table thead th:nth-child(2) { width: 14%; }
+  .final-sheet-table thead th:nth-child(3) { width: 22%; }
+  .final-sheet-table thead th:nth-child(4), .final-sheet-table thead th:nth-child(5) { width: 20%; }
+  .final-sheet-table tbody th { background: white; }
+  .inactive-ceremony-items, .final-sheet-confirmations { break-inside: avoid; page-break-inside: avoid; margin: 6mm 0 0; }
+  .final-sheet-footer { margin-top: 6mm; padding: 3mm 0 0; background: white; }
 }

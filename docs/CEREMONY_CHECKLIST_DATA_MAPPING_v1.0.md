@@ -474,3 +474,15 @@ B. 여러 예식
 5. 다른 기기에서도 같은 최신표를 보여 주려면 서버·로그인·권한을 별도 Batch로 만든다.
 
 이 문서의 데이터 정책은 여전히 Product Owner가 검토할 `PROPOSED` 제안이다. 위 W2.4 로컬 구현 상태만 코드와 자동 테스트로 확인했으며 Final Snapshot·통합 운영표 완료를 의미하지 않는다.
+
+## 15. W3 개별 최종 식순표 구현 반영
+
+- `IMPLEMENTED`: [`FinalCeremonySheet.tsx`](../src/features/wedding-builder/components/FinalCeremonySheet.tsx)를 Owner Step 5에 연결했다.
+- `VERIFIED`: 실제 `order`, 안정 ID, 혼인서약·성혼선언 주체, 공연 카드 순서, Cue·Note 분리, 누락값 `확인 필요`, 입력 불변성, localStorage 미호출, 인쇄 버튼을 자동 테스트로 확인했다.
+- `PROPOSED`: `active=false`는 기본 표에서 제외하고 하단 미진행 목록에 제목을 표시한다. 입력 데이터는 변경하지 않는다.
+- `PROPOSED`: 공연은 카드 수와 입력 정보를 표시하며 카드 1개를 1곡으로 확정하지 않는다.
+- `IMPLEMENTED`: A4 세로용 `@media print`와 브라우저 인쇄 버튼을 제공한다.
+- `NOT IMPLEMENTED`: Final Snapshot, 확정 잠금, 주말 통합 운영표, 역할 권한, 서버 저장, Change History.
+- 상세 구현 근거: [`FINAL_CEREMONY_SHEET_IMPLEMENTATION_v0.1.md`](./FINAL_CEREMONY_SHEET_IMPLEMENTATION_v0.1.md)
+
+재현이 `.pages` Preview에서 직접 확인한 `식순 / 체크사항 / 비고` 구조는 정보 구분 근거로만 사용했다. 현재 화면은 진행 정보, Cue, Note, 확인 필요를 분리해 확장했으며 샘플의 빈 값이나 개인정보를 복제하지 않았다.
